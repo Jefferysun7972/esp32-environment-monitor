@@ -1,0 +1,64 @@
+# === ESP-IDF Build Artifacts ===
+build/
+managed_components/
+dependencies.lock
+
+# === IDE and Editor Files ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# === Compiled Object files ===
+*.o
+*.obj
+*.elf
+*.map
+
+# === Libraries ===
+*.a
+*.lib
+
+# === Shared libraries (DLLs, SOs) ===
+*.dll
+*.so
+*.dylib
+
+# === Executables ===
+*.exe
+*.out
+*.app
+
+# === Binary firmware images ===
+*.bin
+*.hex
+
+# === Backup files ===
+*.bak
+*.orig
+
+# === SDK Configuration (optional - keep if you want to share config) ===
+# sdkconfig
+# sdkconfig.h
+# sdkconfig.old
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+
+# === Logs ===
+*.log
+logs/
+
+# === Temporary files ===
+tmp/
+temp/
+*.tmp
