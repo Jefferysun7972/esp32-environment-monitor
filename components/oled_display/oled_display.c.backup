@@ -1,0 +1,474 @@
+/**
+ * @file oled_display.c
+ * @brief Custom SSD1306 OLED driver using verified low-level I2C API
+ * 
+ * This driver bypasses ESP-IDF's problematic esp_lcd driver and uses
+ * i2c_master_transmit() directly, which has been proven to work correctly.
+ */
+
+#include <string.h>
+#include <stdlib.h>                          /* ← 新增：malloc/free/calloc */
+#include "driver/i2c_master.h"
+#include "freertos/FreeRTOS.h"               /* ← 新增：vTaskDelay */
+#include "freertos/task.h"                   /* ← 新增：portTICK_PERIOD_MS */
+#include "oled_display.h"
+#include "esp_log.h"
+#include "i2c_manager.h"
+
+static const char *TAG = "OLED_Display";
+
+/* Handle storage - Custom driver only (no more esp_lcd dependency!) */
+static i2c_master_dev_handle_t s_oled_dev_handle = NULL;  /* 只保留这个 */
+static bool s_using_custom_driver = false;
+
+/* Internal function prototypes */
+static esp_err_t ssd1306_init_sequence(i2c_master_dev_handle_t dev);
+static esp_err_t oled_custom_send_command(i2c_master_dev_handle_t dev, uint8_t cmd);
+static esp_err_t oled_custom_send_data(i2c_master_dev_handle_t dev, const uint8_t *data, size_t len);
+/*
+ * ============================================================
+ * CUSTOM DRIVER FUNCTIONS (Verified Working!)
+ * ============================================================
+ */
+
+/**
+ * @brief Send single command to SSD1306
+ */
+static esp_err_t oled_custom_send_command(i2c_master_dev_handle_t dev, uint8_t cmd)
+{
+    uint8_t buf[2] = {0x00, cmd};  /* Co=0 (command mode) + command byte */
+    return i2c_master_transmit(dev, buf, 2, -1);
+}
+
+/**
+ * @brief Send data buffer to SSD1306
+ */
+static esp_err_t oled_custom_send_data(i2c_master_dev_handle_t dev, const uint8_t *data, size_t len)
+{
+    /* We need to send: Co=1 (data mode) + data bytes */
+    size_t total_len = 1 + len;
+    uint8_t *tx_buf = malloc(total_len);
+    if (!tx_buf) return ESP_ERR_NO_MEM;
+    
+    tx_buf[0] = 0x40;  /* Co=1, Data mode continuation bit */
+    memcpy(&tx_buf[1], data, len);
+    
+    esp_err_t ret = i2c_master_transmit(dev, tx_buf, total_len, -1);
+    free(tx_buf);
+    return ret;
+}
+
+/**
+ * @brief Complete SSD1306 initialization sequence (PROVEN TO WORK!)
+ */
+static esp_err_t ssd1306_init_sequence(i2c_master_dev_handle_t dev)
+{
+    esp_err_t ret;
+    
+    /* Display OFF */
+    ret = oled_custom_send_command(dev, 0xAE);
+    if (ret != ESP_OK) return ret;
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+    
+    /* Set Memory Addressing Mode to Horizontal */
+    uint8_t addr_mode[] = {0x20, 0x00};
+    ret = oled_custom_send_data(dev, addr_mode, 2);  /* Send as command sequence */
+    if (ret != ESP_OK) return ret;
+    
+    /* Actually, let's send commands properly */
+    ret = oled_custom_send_command(dev, 0x20);  /* Set addressing mode */
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+    ret = oled_custom_send_command(dev, 0x00);  /* Horizontal mode */
+    if (ret != ESP_OK) return ret;
+    
+    /* Set Column address range */
+    ret = oled_custom_send_command(dev, 0x21);  /* Column addr command */
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+    ret = oled_custom_send_command(dev, 0x00);  /* Start = 0 */
+    if (ret != ESP_OK) return ret;
+    ret = oled_custom_send_command(dev, 0x7F);  /* End = 127 */
+    if (ret != ESP_OK) return ret;
+    
+    /* Set Page address range */
+    ret = oled_custom_send_command(dev, 0x22);  /* Page addr command */
+    vTaskDelay(5 / portTICK_PERIOD_MS);
+    ret = oled_custom_send_command(dev, 0x00);  /* Start page = 0 */
+    if (ret != ESP_OK) return ret;
+    ret = oled_custom_send_command(dev, 0x07);  /* End page = 7 */
+    if (ret != ESP_OK) return ret;
+    
+    /* Segment Re-map (A0: column 0 mapped to SEG0) */
+    ret = oled_custom_send_command(dev, 0xA0);
+    if (ret != ESP_OK) return ret;
+    
+    /* COM Output Scan Direction (C0: scan from COM0 to COM[N-1]) */
+    ret = oled_custom_send_command(dev, 0xC0);
+    if (ret != ESP_OK) return ret;
+    
+    /* Set COM Pins Hardware Configuration */
+    ret = oled_custom_send_command(dev, 0xDA);
+    if (ret != ESP_OK) return ret;
+    ret = oled_custom_send_command(dev, 0x12);  /* Alternative COM pin config */
+    if (ret != ESP_OK) return ret;
+    
+    /* Set Contrast Control */
+    ret = oled_custom_send_command(dev, 0x81);
+    if (ret != ESP_OK) return ret;
+    ret = oled_custom_send_command(dev, 0xCF);  /* Contrast = 207/255 (~81%) */
+    if (ret != ESP_OK) return ret;
+    
+    /* Disable Entire Display On */
+    ret = oled_custom_send_command(dev, 0xA4);  /* Normal display (not all on) */
+    if (ret != ESP_OK) return ret;
+    
+    /* Set Normal/Inverse Display */
+    ret = oled_custom_send_command(dev, 0xA6);  /* Normal display (not inverted) */
+    if (ret != ESP_OK) return ret;
+    
+    /* Set Display Clock Divide Ratio/Oscillator Frequency */
+    ret = oled_custom_send_command(dev, 0xD5);
+    if (ret != ESP_OK) return ret;
+    ret = oled_custom_send_command(dev, 0x80);  /* Recommended value */
+    if (ret != ESP_OK) return ret;
+    
+    /* Enable Charge Pump Regulator */
+    ret = oled_custom_send_command(dev, 0x8D);
+    if (ret != ESP_OK) return ret;
+    ret = oled_custom_send_command(dev, 0x14);  /* Enable charge pump */
+    if (ret != ESP_OK) return ret;
+    
+    /* Display ON */
+    ret = oled_custom_send_command(dev, 0xAF);
+    if (ret != ESP_OK) return ret;
+    
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+    
+    return ESP_OK;
+}
+
+/**
+ * @brief Clear screen using custom driver (fill with zeros)
+ */
+static esp_err_t oled_custom_clear(void)
+{
+    if (!s_oled_dev_handle || !s_using_custom_driver) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    /* Send full screen of zeros - page by page for reliability */
+    for (int page = 0; page < 8; page++) {
+        /* Set page start address */
+        esp_err_t ret = oled_custom_send_command(s_oled_dev_handle, (uint8_t)(0xB0 | page));
+        if (ret != ESP_OK) return ret;
+        
+        vTaskDelay(2 / portTICK_PERIOD_MS);
+        
+        /* Send 128 bytes of zeros for this page */
+        uint8_t zero_data[128];
+        memset(zero_data, 0x00, sizeof(zero_data));
+        
+        ret = oled_custom_send_data(s_oled_dev_handle, zero_data, sizeof(zero_data));
+        if (ret != ESP_OK) return ret;
+        
+        vTaskDelay(5 / portTICK_PERIOD_MS);
+    }
+    
+    return ESP_OK;
+}
+
+/**
+ * @brief Draw framebuffer to screen using custom driver
+ */
+static esp_err_t oled_custom_draw_bitmap(const uint8_t *framebuffer, size_t len)
+{
+    if (!s_oled_dev_handle || !s_using_custom_driver || !framebuffer) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    /* Send framebuffer data page by page (128 bytes per page) */
+    for (int page = 0; page < 8; page++) {
+        /* Set page address */
+        esp_err_t ret = oled_custom_send_command(s_oled_dev_handle, (uint8_t)(0xB0 | page));
+        if (ret != ESP_OK) return ret;
+        
+        vTaskDelay(1 / portTICK_PERIOD_MS);
+        
+        /* Send 128 bytes for this page */
+        const uint8_t *page_data = &framebuffer[page * 128];
+        ret = oled_custom_send_data(s_oled_dev_handle, page_data, 128);
+        if (ret != ESP_OK) return ret;
+        
+        vTaskDelay(3 / portTICK_PERIOD_MS);
+    }
+    
+    return ESP_OK;
+}
+
+/*
+ * ============================================================
+ * PUBLIC API FUNCTIONS
+ * ============================================================
+ */
+
+esp_err_t oled_init(void)
+{
+    ESP_LOGI(TAG, "Initializing OLED with custom driver...");
+    
+    esp_err_t ret;
+    
+    /*
+     * Step 1: Get I2C bus from manager
+     */
+    i2c_master_bus_handle_t bus = i2c_manager_get_bus_handle();
+    if (!bus) {
+        ESP_LOGE(TAG, "❌ Failed to get I2C bus handle");
+        return ESP_ERR_NOT_FOUND;
+    }
+    
+    ESP_LOGI(TAG, "✅ Obtained I2C bus handle");
+    
+    /*
+     * Step 2: Create device handle for custom driver
+     */
+    i2c_device_config_t dev_cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = OLED_I2C_ADDRESS,
+        .scl_speed_hz = 400000,
+        .scl_wait_us = 10000,
+        .flags = {
+            .disable_ack_check = false,
+        },
+    };
+    
+    ret = i2c_master_bus_add_device(bus, &dev_cfg, &s_oled_dev_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "❌ Failed to create I2C device handle: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    ESP_LOGI(TAG, "✅ Created I2C device handle at 0x%02X", OLED_I2C_ADDRESS);
+    
+    /*
+     * Step 3: Initialize SSD1306 with proven command sequence
+     */
+    ret = ssd1306_init_sequence(s_oled_dev_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "❌ SSD1306 init failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    s_using_custom_driver = true;
+    
+    /*
+     * Step 4: Clear screen
+     */
+    ret = oled_custom_clear();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "⚠️ Screen clear failed (non-critical): %s", esp_err_to_name(ret));
+    }
+    
+    ESP_LOGI(TAG, "✅ OLED initialized successfully with custom driver!");
+    ESP_LOGI(TAG, "   Driver mode: Custom (i2c_master_transmit)");
+    ESP_LOGI(TAG, "   Display type: 128x64 Yellow-Blue Dual Color");
+    
+    return ESP_OK;
+}
+
+/* 
+ * Helper function for Page-Oriented pixel format
+ * SSD1306 memory layout: 8 pages × 128 columns
+ */
+static inline void set_pixel_page_mode(uint8_t *fb, int x, int y)
+{
+    if (x < 0 || x >= OLED_WIDTH || y < 0 || y >= OLED_HEIGHT) return;
+    
+    int page = y / 8;
+    int byte_idx = page * OLED_WIDTH + x;
+    int bit_idx = y % 8;
+    
+    fb[byte_idx] |= (1 << bit_idx);
+}
+
+
+esp_err_t oled_show_startup(void)
+{
+    if (!s_using_custom_driver) return ESP_ERR_INVALID_STATE;
+    
+    /* Allocate framebuffer in PAGE-ORIENTED format (1024 bytes for 128×64) */
+    size_t buf_size = OLED_WIDTH * OLED_HEIGHT / 8;  /* 128*64/8 = 1024 */
+    uint8_t *framebuffer = calloc(buf_size, sizeof(uint8_t));
+    if (!framebuffer) return ESP_ERR_NO_MEM;
+    
+    /* Draw border rectangle */
+    for (int x = 0; x < OLED_WIDTH; x++) {
+        set_pixel_page_mode(framebuffer, x, 0);              /* Top border */
+        set_pixel_page_mode(framebuffer, x, OLED_HEIGHT-1);  /* Bottom border */
+    }
+    for (int y = 0; y < OLED_HEIGHT; y++) {
+        set_pixel_page_mode(framebuffer, 0, y);              /* Left border */
+        set_pixel_page_mode(framebuffer, OLED_WIDTH-1, y);   /* Right border */
+    }
+    
+    /* Send to display */
+    esp_err_t ret = oled_custom_draw_bitmap(framebuffer, buf_size);
+    free(framebuffer);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Startup screen displayed (border)");
+    }
+    
+    return ret;
+}
+
+
+esp_err_t oled_show_warmup(int seconds_remaining)
+{
+    if (!s_using_custom_driver) return ESP_ERR_INVALID_STATE;
+    
+    size_t buf_size = OLED_WIDTH * OLED_HEIGHT / 8;
+    uint8_t *framebuffer = calloc(buf_size, sizeof(uint8_t));
+    if (!framebuffer) return ESP_ERR_NO_MEM;
+    
+    /* Draw border */
+    for (int x = 0; x < OLED_WIDTH; x++) {
+        set_pixel_page_mode(framebuffer, x, 0);
+        set_pixel_page_mode(framebuffer, x, OLED_HEIGHT-1);
+    }
+    for (int y = 0; y < OLED_HEIGHT; y++) {
+        set_pixel_page_mode(framebuffer, 0, y);
+        set_pixel_page_mode(framebuffer, OLED_WIDTH-1, y);
+    }
+    
+    /* Draw progress bar */
+    int total_seconds = 15;
+    int bar_max_width = 88;
+    int bar_x = 20;
+    int bar_y = 28;
+    int bar_height = 8;
+    
+    int bar_width = (seconds_remaining * bar_max_width) / total_seconds;
+    if (bar_width > bar_max_width) bar_width = bar_max_width;
+    if (bar_width < 1) bar_width = 1;
+    
+    for (int y = bar_y; y < bar_y+bar_height && y < OLED_HEIGHT; y++) {
+        for (int x = bar_x; x < bar_x+bar_width && x < OLED_WIDTH; x++) {
+            set_pixel_page_mode(framebuffer, x, y);
+        }
+    }
+    
+    esp_err_t ret = oled_custom_draw_bitmap(framebuffer, buf_size);
+    free(framebuffer);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Warm-up: %d seconds remaining", seconds_remaining);
+    }
+    
+    return ret;
+}
+
+
+esp_err_t oled_update_display(
+    float temperature,
+    float humidity,
+    float pm25,
+    uint16_t co2,
+    float voc,
+    float nox,
+    bool is_alert
+)
+{
+    if (!s_using_custom_driver) return ESP_ERR_INVALID_STATE;
+    
+    size_t buf_size = OLED_WIDTH * OLED_HEIGHT / 8;
+    uint8_t *framebuffer = calloc(buf_size, sizeof(uint8_t));
+    if (!framebuffer) return ESP_ERR_NO_MEM;
+    
+    /* Draw border */
+    for (int x = 0; x < OLED_WIDTH; x++) {
+        set_pixel_page_mode(framebuffer, x, 0);
+        set_pixel_page_mode(framebuffer, x, OLED_HEIGHT-1);
+    }
+    for (int y = 0; y < OLED_HEIGHT; y++) {
+        set_pixel_page_mode(framebuffer, 0, y);
+        set_pixel_page_mode(framebuffer, OLED_WIDTH-1, y);
+    }
+    
+    /* Status indicator at top center */
+    if (is_alert) {
+        /* Alert: larger filled area */
+        for (int y = 4; y < 12 && y < OLED_HEIGHT; y++) {
+            for (int x = 38; x < 90 && x < OLED_WIDTH; x++) {
+                set_pixel_page_mode(framebuffer, x, y);
+            }
+        }
+    } else {
+        /* Normal: smaller indicator */
+        for (int y = 6; y < 11 && y < OLED_HEIGHT; y++) {
+            for (int x = 48; x < 80 && x < OLED_WIDTH; x++) {
+                set_pixel_page_mode(framebuffer, x, y);
+            }
+        }
+    }
+    
+    /* PM2.5 progress bar (left side) */
+    int pm_max_width = 50;
+    int pm_fill = (int)(pm25 / 200.0f * pm_max_width);
+    if (pm_fill > pm_max_width) pm_fill = pm_max_width;
+    if (pm_fill < 0) pm_fill = 0;
+    
+    for (int y = 36; y <= 41 && y < OLED_HEIGHT; y++) {
+        for (int x = 10; x < 10+pm_fill && x < OLED_WIDTH; x++) {
+            set_pixel_page_mode(framebuffer, x, y);
+        }
+    }
+    
+    /* CO2 progress bar (right side) */
+    int co2_max_width = 50;
+    int co2_fill = (int)((float)co2 / 2000.0f * co2_max_width);
+    if (co2_fill > co2_max_width) co2_fill = co2_max_width;
+    if (co2_fill < 0) co2_fill = 0;
+    
+    for (int y = 46; y <= 51 && y < OLED_HEIGHT; y++) {
+        for (int x = 68; x < 68+co2_fill && x < OLED_WIDTH; x++) {
+            set_pixel_page_mode(framebuffer, x, y);
+        }
+    }
+    
+    esp_err_t ret = oled_custom_draw_bitmap(framebuffer, buf_size);
+    free(framebuffer);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Display updated - T=%.1f°C H=%.1f%% PM2.5=%.1f CO2=%uppm Alert=%d",
+                 temperature, humidity, pm25, co2, is_alert);
+    }
+    
+    return ret;
+}
+
+
+esp_err_t oled_clear(void)
+{
+    if (s_using_custom_driver) {
+        return oled_custom_clear();
+    }
+    return ESP_ERR_INVALID_STATE;
+}
+
+
+esp_err_t oled_deinit(void)
+{
+    /* Turn off display before cleanup */
+    if (s_oled_dev_handle && s_using_custom_driver) {
+        oled_custom_send_command(s_oled_dev_handle, 0xAE);  /* Display OFF */
+        vTaskDelay(10 / portTICK_PERIOD_MS);                /* ← 现在可以用了！*/
+        
+        /* Remove device handle */
+        i2c_master_bus_rm_device(s_oled_dev_handle);
+        s_oled_dev_handle = NULL;
+    }
+    
+    s_using_custom_driver = false;
+    
+    ESP_LOGI(TAG, "OLED deinitialized");
+    return ESP_OK;
+}

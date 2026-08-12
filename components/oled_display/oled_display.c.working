@@ -1,0 +1,397 @@
+/**
+ * @file oled_display.c
+ * @brief Implementation of OLED display using ESP-IDF official esp_lcd driver
+ */
+
+#include <string.h>
+#include "driver/i2c_master.h"
+#include "oled_display.h"
+#include "esp_log.h"
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_vendor.h"
+#include "esp_lcd_panel_ops.h"
+#include "i2c_manager.h"
+
+static const char *TAG = "OLED_Display";
+
+/* Handle storage */
+static esp_lcd_panel_handle_t s_panel_handle = NULL;
+static esp_lcd_panel_io_handle_t s_io_handle = NULL;
+
+/* Internal function prototypes */
+static esp_err_t setup_i2c_for_oled(void);
+
+esp_err_t oled_init(void)
+{
+    ESP_LOGI(TAG, "Initializing OLED with official esp_lcd driver...");
+    
+    esp_err_t ret;
+    
+    /* Step 1: Setup I2C connection to OLED */
+    ret = setup_i2c_for_oled();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to setup I2C for OLED: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    /* Step 2: Create SSD1306 panel handle */
+    esp_lcd_panel_dev_config_t panel_config = {
+        .reset_gpio_num = -1,
+        .color_space = ESP_LCD_COLOR_SPACE_MONOCHROME,
+        .bits_per_pixel = 1,
+    };
+    
+    ret = esp_lcd_new_panel_ssd1306(s_io_handle, &panel_config, &s_panel_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create SSD1306 panel: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    /* Step 3: Reset and initialize panel */
+    ret = esp_lcd_panel_reset(s_panel_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Panel reset failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    ret = esp_lcd_panel_init(s_panel_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Panel init failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    /* Step 4: Configure display settings */
+    esp_lcd_panel_invert_color(s_panel_handle, false);
+    
+    /* Turn on display */
+    ret = esp_lcd_panel_disp_on_off(s_panel_handle, true);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to turn on display: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    /* Clear and show startup screen */
+    oled_clear();
+    
+    /* 
+     * 🔬 ULTRA DEBUG MODE: Use lowest-level I2C API to isolate the problem
+     * This completely bypasses ALL driver layers including esp_lcd!
+     */
+    #ifdef OLED_DEBUG_TEST
+    ESP_LOGW(TAG, "🔬 ULTRA DEBUG: Using lowest-level i2c_master_transmit API...");
+    
+    i2c_master_bus_handle_t bus = i2c_manager_get_bus_handle();
+    
+    if (bus) {
+        /* Create a temporary device handle for DIRECT I2C access */
+        i2c_device_config_t dev_cfg = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,  // 必须指定地址长度
+            .device_address = OLED_I2C_ADDRESS,      // ← 正确：device_address
+            .scl_speed_hz = 400000,                  // 必须指定时钟频率
+            .scl_wait_us = 10000,                    // 必须指定超时
+            .flags = {
+                .disable_ack_check = false,          // ← 正确：在 flags 结构体内
+            },
+        };
+        
+        i2c_master_dev_handle_t oled_dev = NULL;
+        ret = i2c_master_bus_add_device(bus, &dev_cfg, &oled_dev);
+        
+        if (ret == ESP_OK && oled_dev) {
+            ESP_LOGI(TAG, "✅ Direct I2C device handle created for OLED testing");
+            
+            /* === TEST 1: Clear screen to BLACK === */
+            ESP_LOGI(TAG, "Direct Test 1: Sending BLACK screen (all zeros)...");
+            
+            /* Display OFF */
+            uint8_t off_cmd[] = {0xAE};
+            i2c_master_transmit(oled_dev, off_cmd, 1, -1);
+            vTaskDelay(50 / portTICK_PERIOD_MS);
+            
+            /* Send 1024 bytes of zeros (full screen clear) - page by page */
+            for (int page = 0; page < 8; page++) {
+                /* Set page address */
+                uint8_t page_addr[] = {(uint8_t)(0xB0 | page)};
+                i2c_master_transmit(oled_dev, page_addr, 1, -1);
+                vTaskDelay(5 / portTICK_PERIOD_MS);
+                
+                /* Send 128 bytes of zero data for this page */
+                uint8_t tx_buf[129];  /* 1 control byte + 128 data bytes */
+                tx_buf[0] = 0x40;  /* Co=1, Data mode continuation bit */
+                memset(&tx_buf[1], 0x00, 128);  /* All pixels OFF (black) */
+                
+                i2c_master_transmit(oled_dev, tx_buf, 129, -1);
+                vTaskDelay(10 / portTICK_PERIOD_MS);
+            }
+            
+            /* Display ON */
+            uint8_t on_cmd[] = {0xAF};
+            i2c_master_transmit(oled_dev, on_cmd, 1, -1);
+            
+            ESP_LOGI(TAG, "   ⏳ Screen should be completely BLACK. Waiting 4 seconds...");
+            vTaskDelay(4000 / portTICK_PERIOD_MS);
+            
+            /* === TEST 2: Fill screen with WHITE === */
+            ESP_LOGI(TAG, "Direct Test 2: Sending WHITE screen (all 0xFF)...");
+            
+            for (int page = 0; page < 8; page++) {
+                uint8_t page_addr[] = {(uint8_t)(0xB0 | page)};
+                i2c_master_transmit(oled_dev, page_addr, 1, -1);
+                vTaskDelay(5 / portTICK_PERIOD_MS);
+                
+                uint8_t tx_buf[129];
+                tx_buf[0] = 0x40;  /* Co=1, Data mode */
+                memset(&tx_buf[1], 0xFF, 128);  /* All pixels ON (white) */
+                
+                i2c_master_transmit(oled_dev, tx_buf, 129, -1);
+                vTaskDelay(10 / portTICK_PERIOD_MS);
+            }
+            
+            ESP_LOGI(TAG, "   ⏳ Screen should be completely WHITE. Waiting 4 seconds...");
+            vTaskDelay(4000 / portTICK_PERIOD_MS);
+            
+            /* Cleanup temporary device handle */
+            i2c_master_bus_rm_device(oled_dev);
+            
+            ESP_LOGW(TAG, "🔬 Direct I2C test complete!");
+            ESP_LOGW(TAG, "   Did you see: BLACK → WHITE transition?");
+            ESP_LOGW(TAG, "   If STILL garbled → Hardware/I2C bus issue!");
+        } else {
+            ESP_LOGE(TAG, "❌ Failed to create direct I2C device: %s", esp_err_to_name(ret));
+        }
+    } else {
+        ESP_LOGE(TAG, "❌ No I2C bus handle available");
+    }
+    #endif /* OLED_DEBUG_TEST */
+    
+    ESP_LOGI(TAG, "✅ OLED initialized successfully with official driver!");
+    return ESP_OK;
+}
+
+/**
+ * @brief Setup I2C connection for OLED display using centralized I2C manager
+ */
+static esp_err_t setup_i2c_for_oled(void)
+{
+    esp_err_t ret;
+    i2c_master_bus_handle_t bus_handle = NULL;
+    
+    bus_handle = i2c_manager_get_bus_handle();
+    
+    if (bus_handle == NULL) {
+        ESP_LOGE(TAG, "❌ Failed to get I2C bus handle from I2C Manager");
+        return ESP_ERR_NOT_FOUND;
+    }
+    
+    ESP_LOGI(TAG, "✅ Successfully obtained I2C bus handle from I2C Manager");
+    
+    esp_lcd_panel_io_i2c_config_t io_config = {
+        .dev_addr = OLED_I2C_ADDRESS,
+        .on_color_trans_done = NULL,
+        .user_ctx = NULL,
+        .control_phase_bytes = 1,
+        .dc_bit_offset = 0,
+        .lcd_cmd_bits = 8,
+        .lcd_param_bits = 8,
+        .scl_speed_hz = 400000,
+    };
+    
+    ret = esp_lcd_new_panel_io_i2c(bus_handle, &io_config, &s_io_handle);
+    
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "❌ Failed to create panel IO handle for SSD1306: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    ESP_LOGI(TAG, "✅ SSD1306 panel IO handle created at address 0x%02X", OLED_I2C_ADDRESS);
+    
+    return ESP_OK;
+}
+
+/*
+ * Helper function to set a pixel in page-oriented format
+ */
+static inline void set_pixel_page_mode(uint8_t *fb, int x, int y)
+{
+    if (x < 0 || x >= OLED_WIDTH || y < 0 || y >= OLED_HEIGHT) return;
+    
+    int page = y / 8;
+    int byte_idx = page * OLED_WIDTH + x;
+    int bit_idx = y % 8;
+    
+    fb[byte_idx] |= (1 << bit_idx);
+}
+
+
+esp_err_t oled_show_startup(void)
+{
+    if (!s_panel_handle) return ESP_ERR_INVALID_STATE;
+    
+    size_t buf_size = (OLED_WIDTH / 8) * OLED_HEIGHT;
+    uint8_t *framebuffer = calloc(buf_size, sizeof(uint8_t));
+    if (!framebuffer) return ESP_ERR_NO_MEM;
+    
+    for (int x = 0; x < OLED_WIDTH; x++) {
+        set_pixel_page_mode(framebuffer, x, 0);
+        set_pixel_page_mode(framebuffer, x, OLED_HEIGHT - 1);
+    }
+    for (int y = 0; y < OLED_HEIGHT; y++) {
+        set_pixel_page_mode(framebuffer, 0, y);
+        set_pixel_page_mode(framebuffer, OLED_WIDTH - 1, y);
+    }
+    
+    esp_lcd_panel_draw_bitmap(s_panel_handle, 0, 0, OLED_WIDTH, OLED_HEIGHT, framebuffer);
+    free(framebuffer);
+    
+    ESP_LOGI(TAG, "Startup screen displayed (page-oriented format)");
+    return ESP_OK;
+}
+esp_err_t oled_show_warmup(int seconds_remaining)
+{
+    if (!s_panel_handle) return ESP_ERR_INVALID_STATE;
+    
+    size_t buf_size = (OLED_WIDTH / 8) * OLED_HEIGHT;
+    uint8_t *framebuffer = calloc(buf_size, sizeof(uint8_t));
+    if (!framebuffer) return ESP_ERR_NO_MEM;
+    
+    for (int x = 0; x < OLED_WIDTH; x++) {
+        set_pixel_page_mode(framebuffer, x, 0);
+        set_pixel_page_mode(framebuffer, x, OLED_HEIGHT - 1);
+    }
+    for (int y = 0; y < OLED_HEIGHT; y++) {
+        set_pixel_page_mode(framebuffer, 0, y);
+        set_pixel_page_mode(framebuffer, OLED_WIDTH - 1, y);
+    }
+    
+    int total_seconds = 15;
+    int bar_max_width = 88;
+    int bar_x = 20;
+    int bar_y = 28;
+    int bar_height = 8;
+    
+    int bar_width = (seconds_remaining * bar_max_width) / total_seconds;
+    if (bar_width > bar_max_width) bar_width = bar_max_width;
+    if (bar_width < 1) bar_width = 1;
+    
+    for (int y = bar_y; y < bar_y + bar_height && y < OLED_HEIGHT; y++) {
+        for (int x = bar_x; x < bar_x + bar_width && x < OLED_WIDTH; x++) {
+            set_pixel_page_mode(framebuffer, x, y);
+        }
+    }
+    
+    esp_lcd_panel_draw_bitmap(s_panel_handle, 0, 0, OLED_WIDTH, OLED_HEIGHT, framebuffer);
+    free(framebuffer);
+    
+    ESP_LOGI(TAG, "Warm-up: %d seconds remaining", seconds_remaining);
+    return ESP_OK;
+}
+
+esp_err_t oled_update_display(
+    float temperature,
+    float humidity,
+    float pm25,
+    uint16_t co2,
+    float voc,
+    float nox,
+    bool is_alert
+)
+{
+    if (!s_panel_handle) return ESP_ERR_INVALID_STATE;
+    
+    size_t buf_size = (OLED_WIDTH / 8) * OLED_HEIGHT;
+    uint8_t *framebuffer = calloc(buf_size, sizeof(uint8_t));
+    if (!framebuffer) return ESP_ERR_NO_MEM;
+    
+    for (int x = 0; x < OLED_WIDTH; x++) {
+        set_pixel_page_mode(framebuffer, x, 0);
+        set_pixel_page_mode(framebuffer, x, OLED_HEIGHT - 1);
+    }
+    for (int y = 0; y < OLED_HEIGHT; y++) {
+        set_pixel_page_mode(framebuffer, 0, y);
+        set_pixel_page_mode(framebuffer, OLED_WIDTH - 1, y);
+    }
+    
+    if (is_alert) {
+        for (int y = 4; y < 12 && y < OLED_HEIGHT; y++) {
+            for (int x = 38; x < 90 && x < OLED_WIDTH; x++) {
+                set_pixel_page_mode(framebuffer, x, y);
+            }
+        }
+    } else {
+        for (int y = 6; y < 11 && y < OLED_HEIGHT; y++) {
+            for (int x = 48; x < 80 && x < OLED_WIDTH; x++) {
+                set_pixel_page_mode(framebuffer, x, y);
+            }
+        }
+    }
+    
+    int pm_max_width = 50;
+    int pm_fill = (int)(pm25 / 200.0f * pm_max_width);
+    if (pm_fill > pm_max_width) pm_fill = pm_max_width;
+    if (pm_fill < 0) pm_fill = 0;
+    
+    for (int y = 36; y <= 41 && y < OLED_HEIGHT; y++) {
+        for (int x = 10; x < 10 + pm_fill && x < OLED_WIDTH; x++) {
+            set_pixel_page_mode(framebuffer, x, y);
+        }
+    }
+    
+    int co2_max_width = 50;
+    int co2_fill = (int)((float)co2 / 2000.0f * co2_max_width);
+    if (co2_fill > co2_max_width) co2_fill = co2_max_width;
+    if (co2_fill < 0) co2_fill = 0;
+    
+    for (int y = 46; y <= 51 && y < OLED_HEIGHT; y++) {
+        for (int x = 68; x < 68 + co2_fill && x < OLED_WIDTH; x++) {
+            set_pixel_page_mode(framebuffer, x, y);
+        }
+    }
+    
+    esp_lcd_panel_draw_bitmap(s_panel_handle, 0, 0, OLED_WIDTH, OLED_HEIGHT, framebuffer);
+    free(framebuffer);
+    
+    ESP_LOGI(TAG, "Display updated - T=%.1f°C H=%.1f%% PM2.5=%.1f CO2=%uppm Alert=%d",
+             temperature, humidity, pm25, co2, is_alert);
+             
+    return ESP_OK;
+}
+
+esp_err_t oled_clear(void)
+{
+    if (!s_panel_handle) return ESP_ERR_INVALID_STATE;
+    
+    size_t buf_size = (OLED_WIDTH * OLED_HEIGHT + 7) / 8;
+    uint8_t *clear_buffer = calloc(buf_size, sizeof(uint8_t));
+    
+    if (!clear_buffer) {
+        ESP_LOGE(TAG, "Failed to allocate memory for clear buffer");
+        return ESP_ERR_NO_MEM;
+    }
+    
+    esp_err_t ret = esp_lcd_panel_draw_bitmap(
+        s_panel_handle, 
+        0, 0, 
+        OLED_WIDTH, OLED_HEIGHT, 
+        clear_buffer
+    );
+    
+    free(clear_buffer);
+    
+    return ret;
+}
+
+esp_err_t oled_deinit(void)
+{
+    if (s_panel_handle) {
+        esp_lcd_panel_del(s_panel_handle);
+        s_panel_handle = NULL;
+    }
+    
+    if (s_io_handle) {
+        esp_lcd_panel_io_del(s_io_handle);
+        s_io_handle = NULL;
+    }
+    
+    ESP_LOGI(TAG, "OLED display deinitialized");
+    return ESP_OK;
+}

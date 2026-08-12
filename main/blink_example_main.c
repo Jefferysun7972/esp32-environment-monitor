@@ -17,6 +17,7 @@
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "esp_log.h"
+#include "i2c_manager.h"
 #include "led_strip.h"
 #include "sdkconfig.h"
 
@@ -24,6 +25,9 @@
 #include "sen66_i2c.h"
 #include "sensirion_common.h"
 #include "sensirion_i2c_hal.h"
+
+/* OLED Display Driver (ESP-IDF Official) */
+#include "oled_display.h"                    /* ← 新增这行 */
 
 static const char *TAG = "example";
 
@@ -241,6 +245,17 @@ static bool sen66_read_and_display_data(void)
              status_icon, status_text,
              temp_celsius, humidity_pct, pm2_5_ugm3, voc_idx, nox_idx, co2);
 
+        /* Update OLED display with latest readings */                  /* ← 新增：注释 */
+    oled_update_display(                                              /* ← 新增：调用 OLED 更新 */
+        temp_celsius,          /* Temperature in Celsius */         /* ← 参数：温度 */
+        humidity_pct,          /* Humidity percentage */            /* ← 参数：湿度 */
+        pm2_5_ugm3,            /* PM2.5 concentration */            /* ← 参数：PM2.5 */
+        co2,                   /* CO₂ PPM */                       /* ← 参数：二氧化碳 */
+        voc_idx,               /* VOC index */                     /* ← 参数：VOC */
+        nox_idx,               /* NOx index */                     /* ← 参数：NOx */
+        is_alert               /* Alert status */                  /* ← 参数：警报状态 */
+    );  
+
     return is_alert;
 }
 
@@ -258,6 +273,7 @@ void app_main(void)
      */
     ESP_LOGI(TAG, "Initializing I2C and SEN66 sensor...");
     
+    i2c_manager_init();
     /* Step 1: Initialize Sensirion I2C HAL layer (this also initializes I2C hardware) */
     sensirion_i2c_hal_init();
     
@@ -284,11 +300,22 @@ void app_main(void)
     ESP_LOGI(TAG, "⏳ Waiting %d seconds for sensor warm-up and stabilization...", 
              SEN66_WARMUP_DELAY_MS / 1000);
     
+    /* Initialize OLED display (using official esp_lcd driver) */     /* ← 新增：OLED 初始化 */
+    if (oled_init() == ESP_OK) {                                     /* ← 新增：初始化并检查结果 */
+        ESP_LOGI(TAG, "📺 OLED display initialized successfully");   /* ← 新增：成功日志 */
+    } else {                                                         /* ← 新增：错误处理 */
+        ESP_LOGW(TAG, "⚠️  OLED initialization failed - continuing without display");
+    }
+    
     int warmup_countdown = SEN66_WARMUP_DELAY_MS / CONFIG_BLINK_PERIOD;
     
     while (warmup_countdown > 0) {
-        ESP_LOGI(TAG, "   ⏱️  Warm-up: %d seconds remaining...", 
-                 (warmup_countdown * CONFIG_BLINK_PERIOD) / 1000);
+        int seconds_remaining = (warmup_countdown * CONFIG_BLINK_PERIOD) / 1000;  /* ← 修改：计算秒数 */
+        
+        ESP_LOGI(TAG, "   ⏱️  Warm-up: %d seconds remaining...", seconds_remaining);  /* ← 修改：使用变量 */
+        
+        /* Update OLED with warm-up countdown */                   /* ← 新增：更新 OLED 显示 */
+        oled_show_warmup(seconds_remaining);                        /* ← 新增：调用 OLED 函数 */
         
         blink_led();
         s_led_state = !s_led_state;
