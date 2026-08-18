@@ -46,4 +46,19 @@ menu "Example Configuration"
         help
             Define the blinking period in milliseconds.
 
+    choice SENSOR_TYPE
+    prompt "Environmental sensor type"
+    default SENSOR_TYPE_SEN66
+    help
+        Select the environmental sensor type connected to the I2C bus.
+        SEN66: Standard sensor (Temp, Humid, PM2.5/4/10, VOC, NOx, CO2)
+        SEN68: Advanced sensor (All SEN66 features + PM1.0 + HCHO)
+
+    config SENSOR_TYPE_SEN66
+        bool "SEN66 (Standard)"
+
+    config SENSOR_TYPE_SEN68
+        bool "SEN68 (Advanced with PM1.0 + HCHO)"
+    endchoice
+
 endmenu

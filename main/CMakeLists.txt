@@ -4,6 +4,7 @@ idf_component_register(
     REQUIRES
         i2c_manager
         embedded-i2c-sen66
+        embedded-i2c-sen68
         oled_display
         tft_lcd 
 )
