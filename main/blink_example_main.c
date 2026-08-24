@@ -1,14 +1,24 @@
 /*
- * Blink Example with SEN66 Environmental Sensor Integration
+ * ESP32 Environment Monitor with Dual Sensor Support
  * 
  * Features:
  * - LED blinking on GPIO2 (D2) with configurable period
- * - SEN66 sensor reading via I2C (Temperature, Humidity, PM2.5, VOC, NOx, CO2)
+ * - Dual sensor support: SEN66 (default) / SEN68 (with PM1 + HCHO)
+ *   Controlled by CONFIG_SENSOR_TYPE in menuconfig
  * - Three-color level system: BLUE (normal) / ORANGE (warning) / RED (danger)
+ * - 240x320 TFT-LCD display with optimized layout and progress bars
+ * 
+ * Sensor Selection:
+ *   - SEN66: Temperature, Humidity, PM2.5/4/10, VOC, NOx, CO2
+ *   - SEN68: All SEN66 features + PM1.0 ultrafine particles + HCHO formaldehyde
  * 
  * Hardware Connections:
  * - LED: GPIO2 (D2)
- * - SEN66 I2C: SDA=GPIO21, SCL=GPIO22, VCC=3.3V, GND=GND
+ * - Sensor I2C: SDA=GPIO21, SCL=GPIO22, VCC=3.3V, GND=GND
+ * 
+ * Build Configuration:
+ *   idf.py menuconfig → Example Configuration → Sensor Type
+ *   Choose: SENSOR_TYPE_SEN66 (default) or SENSOR_TYPE_SEN68
  */
 
 /* ============================================ */
@@ -29,8 +39,13 @@
 #include "led_strip.h"
 #include "sdkconfig.h"
 
-/* SEN66 Sensor Driver Headers */
-#include "sen66_i2c.h"
+/* ============================================ */
+/* UNIFIED SENSOR CONFIGURATION                */
+/* Auto-selects SEN66 or SEN68 based on menuconfig*/
+/* ============================================ */
+#include "sensor_config.h"  /* Must be included before sensor headers! */
+
+/* Sensirion common headers (shared by both sensors) */
 #include "sensirion_common.h"
 #include "sensirion_i2c_hal.h"
 
@@ -42,25 +57,25 @@
 #include "oled_display.h"
 #endif
 
-static const char *TAG = "example";
+static const char *TAG = "env_monitor";
 
 /* LED Configuration */
 #define BLINK_GPIO CONFIG_BLINK_GPIO
 
-/* I2C Configuration for SEN66 */
+/* I2C Configuration (shared by both sensors) */
 #define I2C_MASTER_SCL_IO           22        /*!< GPIO number used for I2C master clock */
 #define I2C_MASTER_SDA_IO           21        /*!< GPIO number used for I2C master data  */
 #define I2C_MASTER_NUM              0          /*!< I2C master i2c port number */
 #define I2C_MASTER_FREQ_HZ          100000     /*!< I2C master clock frequency */
 
-/* SEN66 Sensor Read Interval (ms) */
-#define SEN66_READ_PERIOD_MS        5000       /*!< Read sensor every 5 seconds */
+/* Sensor Read Interval (ms) - applies to both SEN66 and SEN68 */
+#define SENSOR_READ_PERIOD_MS        5000       /*!< Read sensor every 5 seconds */
 
 /* Sensor warm-up time before first valid reading (ms) */
-#define SEN66_WARMUP_DELAY_MS       15000      /*!< Wait 15 seconds for sensor stabilization */
+#define SENSOR_WARMUP_DELAY_MS       15000      /*!< Wait 15 seconds for sensor stabilization */
 
 /* Number of initial readings to skip during warm-up */
-#define SEN66_WARMUP_READINGS       3          /*!< Skip first 3 readings as they may be unreliable */
+#define SENSOR_WARMUP_READINGS       3          /*!< Skip first 3 readings as they may be unreliable */
 
 /* ============================================ */
 /* THREE-COLOR LEVEL SYSTEM THRESHOLDS          */
@@ -85,6 +100,10 @@ static const char *TAG = "example";
 #define NOX_NORMAL_MAX     100.0f  /* Blue: excellent */
 #define NOX_WARNING_MAX    200.0f  /* Orange warning threshold */
 
+/* PM1 thresholds (µg/m³) - WHO air quality guideline */
+#define PM1_NORMAL_MAX      25.0f   /* Blue: good air quality */
+#define PM1_WARNING_MAX     50.0f   /* Orange: moderate */
+
 /* PM2.5 thresholds (µg/m³) - WHO air quality guideline */
 #define PM25_NORMAL_MAX    35.0f   /* Blue: good air quality */
 #define PM25_WARNING_MAX   75.0f   /* Orange: unhealthy for sensitive groups */
@@ -101,9 +120,14 @@ static const char *TAG = "example";
 #define BLINK_INTERVAL_NORMAL       CONFIG_BLINK_PERIOD  /*!< Normal: 2000ms (from sdkconfig) */
 #define BLINK_INTERVAL_ALERT        200                 /*!< Alert: 200ms (fast flash) */
 
-// 添加回被删除的阈值常量（用于check_environmental_alerts函数）
+// Alert thresholds for LED behavior
 #define PM25_ALERT_THRESHOLD        75         /* PM2.5: >75 µg/m³ */
 #define CO2_ALERT_THRESHOLD         1000       /* CO2: >1000 ppm */
+
+/* HCHO thresholds (ppb) - WHO indoor air quality guideline (SEN68 only) */
+#define HCHO_NORMAL_MAX    80.0f   /* Blue: <0.08ppm */
+#define HCHO_WARNING_MAX   150.0f  /* Orange: 0.08-0.15ppm */
+
 
 static uint8_t s_led_state = 0;
 static bool s_alert_active = false;              /* Track if alert mode is active */
@@ -167,37 +191,56 @@ static void configure_led(void)
 #endif
 
 /**
- * @brief Initialize SEN66 environmental sensor
+ * @brief Initialize environmental sensor (SEN66 or SEN68 based on config)
+ * 
+ * Uses unified macros from sensor_config.h that automatically call
+ * the correct API functions based on CONFIG_SENSOR_TYPE selection.
  */
-static void sen66_init_sensor(void)
+static void init_environmental_sensor(void)
 {
     int16_t error = NO_ERROR;
 
-    ESP_LOGI(TAG, "Initializing SEN66 environmental sensor...");
+    /* ===== RUNTIME SENSOR DETECTION ===== */
+    /* Automatically identify SEN66 vs SEN68 at startup */
+    if (detect_sensor_type() != 0) {
+        ESP_LOGW(TAG, "⚠️ Sensor detection failed, using default (SEN66) mode");
+    }
+    
+    #if USE_TFT_LCD
+    /* ← 新增：立即更新标题栏显示 */
+    {
+        const char* sensor_name = g_sensor_name;  // 现在是正确的值："SEN68"或"SEN66"
+        int name_len = strlen(sensor_name);
+        int x_sensor = tft_get_width() - (name_len * 12) - 5;
+        
+        // 清除旧的传感器名称
+        tft_fill_rect(x_sensor, 3, name_len * 12 + 2, 16, TFT_BG_COLOR);
+        // 绘制新的传感器名称
+        tft_draw_string(sensor_name, x_sensor, 3, TFT_GREEN, TFT_BG_COLOR, 2);
+        
+        ESP_LOGI(TAG, "✅ Title bar updated: %s sensor detected", sensor_name);
+    }
+    #endif
 
-    error = sen66_device_reset();
+    ESP_LOGI(TAG, "Initializing %s environmental sensor...", g_sensor_name);
+
+    /* Reset device using unified function */
+    error = sensor_device_reset();
     if (error != NO_ERROR) {
-        ESP_LOGE(TAG, "❌ SEN66 device reset failed: %d", error);
+        ESP_LOGE(TAG, "❌ %s device reset failed: %d", g_sensor_name, error);
         return;
     }
 
     sensirion_i2c_hal_sleep_usec(1200000);
 
-    int8_t serial_number[32] = {0};
-    error = sen66_get_serial_number(serial_number, 32);
-    if (error == NO_ERROR) {
-        ESP_LOGI(TAG, "📋 SEN66 Serial Number: %s", serial_number);
-    } else {
-        ESP_LOGW(TAG, "⚠️  Could not read SEN66 serial number (error: %d)", error);
-    }
-
-    error = sen66_start_continuous_measurement();
+    /* Start continuous measurement using unified macro */
+    error = sensor_start_measurement();
     if (error != NO_ERROR) {
-        ESP_LOGE(TAG, "❌ Failed to start SEN66 continuous measurement: %d", error);
+        ESP_LOGE(TAG, "❌ Failed to start %s continuous measurement: %d", g_sensor_name, error);
         return;
     }
 
-    ESP_LOGI(TAG, "🎉 SEN66 sensor initialized successfully! Ready to read data.");
+    ESP_LOGI(TAG, "🎉 %s sensor initialized successfully! Ready to read data.", g_sensor_name);
 }
 
 /**
@@ -247,7 +290,8 @@ static uint16_t get_level_color(float value, float normal_min, float normal_max,
  */
 static int get_global_alert_level(
     float temp_celsius, float humidity_pct, float nox_idx,
-    float pm2_5_ugm3, uint16_t co2_ppm, float voc_idx)
+    float pm2_5_ugm3, uint16_t hcho_or_co2, float voc_idx,
+    int is_hcho)
 {
     int max_level = 0;  /* Start with best case: BLUE (0) */
     
@@ -282,10 +326,20 @@ static int get_global_alert_level(
     }
     
     /* CO2 check (normal: higher is worse) */
-    if (co2_ppm > CO2_WARNING_MAX) {
-        max_level = 2;  /* RED: High CO2 danger */
-    } else if (co2_ppm > CO2_NORMAL_MAX && max_level < 1) {
-        max_level = 1;  /* ORANGE: High CO2 */
+    if (is_hcho) {
+        /* SEN68: 使用HCHO阈值 */
+        if ((float)hcho_or_co2 > HCHO_WARNING_MAX) {
+            max_level = 2;  // RED: 高甲醛危险
+        } else if ((float)hcho_or_co2 > HCHO_NORMAL_MAX && max_level < 1) {
+            max_level = 1;  // ORANGE: 甲醛偏高
+        }
+    } else {
+        /* SEN66: 使用CO2阈值 */
+        if (hcho_or_co2 > CO2_WARNING_MAX) {
+            max_level = 2;  // RED: 高CO2危险
+        } else if (hcho_or_co2 > CO2_NORMAL_MAX && max_level < 1) {
+            max_level = 1;  // ORANGE: CO2偏高
+        }
     }
     
     /* VOC check (normal: higher is worse) */
@@ -336,31 +390,41 @@ static bool check_environmental_alerts(float pm25_ugm3, uint16_t co2_ppm)
 }
 
 /**
- * @brief Read and display SEN66 sensor data with three-color level system
+ * @brief Read and display sensor data with three-color level system
+ * 
+ * Supports both SEN66 and SEN68 through unified API from sensor_config.h
+ * Automatically handles PM1/HCHO data when using SEN68 sensor
  * 
  * @return Returns true if alert conditions are met, false otherwise
  */
-static bool sen66_read_and_display_data(void)
+static bool read_and_display_sensor_data(void)
 {
+    /* Declare variables for all possible sensor outputs - use int16_t for API compatibility */
     uint16_t pm1p0 = 0, pm2p5 = 0, pm4p0 = 0, pm10p0 = 0;
     int16_t humidity = 0, temperature = 0, voc_index = 0, nox_index = 0;
-    uint16_t co2 = 0;
+    uint16_t co2 = 0, hcho_ppb = 0;  /* Both declared, usage depends on sensor type */
 
-    int16_t error = sen66_read_measured_values_as_integers(
-        &pm1p0, &pm2p5, &pm4p0, &pm10p0,
-        &humidity, &temperature, &voc_index, &nox_index, &co2);
+    /* Use unified API function (automatically routes to correct sensor) */
+    int16_t error = sensor_read_measured_values(
+        &pm1p0, &pm2p5, &pm4p0, &pm10p0,  // ✅ PM在前
+        &humidity, &temperature,           // ✅ 环境参数
+        &voc_index, &nox_index,            // ✅ 空气质量指数
+        g_has_hcho_support ? &hcho_ppb : &co2  // ✅ 动态选择HCHO/CO2
+    );
 
     if (error != NO_ERROR) {
-        ESP_LOGE(TAG, "❌ Error reading SEN66 values: %d", error);
+        ESP_LOGE(TAG, "❌ Error reading %s values: %d", g_sensor_name, error);
         return false;
     }
 
-    /* Convert raw values to physical units according to SEN66 datasheet */
+    /* Convert raw values to physical units according to datasheet */
+    /* Convert raw values to physical units according to datasheet */
     float temp_celsius = (float)temperature / 200.0f;
     float humidity_pct = (float)humidity / 100.0f;
-    float voc_idx = (float)voc_index / 10.0f;
-    float nox_idx = (float)nox_index / 10.0f;
+    float voc_idx_f = (float)voc_index / 10.0f;
+    float nox_idx_f = (float)nox_index / 10.0f;
     float pm2_5_ugm3 = (float)pm2p5 / 10.0f;
+    float pm1_ugm3 = g_has_pm1_support ? (float)pm1p0 / 10.0f : 0.0f;  /* PM1 only available on SEN68 */
 
     /* Check for alert conditions and determine status indicator */
     bool is_alert = check_environmental_alerts(pm2_5_ugm3, co2);
@@ -368,13 +432,32 @@ static bool sen66_read_and_display_data(void)
     const char* status_icon = is_alert ? "🔴" : "💚";
     const char* status_text = is_alert ? "⚠️  ALERT" : "✅ NORMAL";
 
-    /* Display formatted sensor data with status indicator */
-    ESP_LOGI(TAG, 
-             "[SEN66] %s %s | 🌡️ Temp: %.1f°C | 💧 Hum: %.1f%% | 🌫️ PM2.5: %.1fµg/m³ | "
-             "🌬️ VOC: %.1f | ⚠️  NOx: %.1f | 🔴 CO₂: %uppm",
-             status_icon, status_text,
-             temp_celsius, humidity_pct, pm2_5_ugm3, voc_idx, nox_idx, co2);
-
+    /* Display formatted sensor data - Auto-adapts based on detected sensor type */
+    if (g_has_pm1_support && g_has_hcho_support) {
+        /* SEN68 mode: Include PM1 and HCHO in single line */
+        ESP_LOGI(TAG,
+                 "[%s] %s %s | 🌡️ %.1f°C | 💧 %.1f%% | 🌫️ PM2.5: %.1fµg/m³ | ✨ PM1: %.1fµg/m³ | "
+                 "🌬️ VOC: %.1f | ⚠️ NOx: %.1f | 🧪 HCHO: %u ppb",
+                 g_sensor_name, status_icon, status_text,
+                 temp_celsius, humidity_pct, pm2_5_ugm3, pm1_ugm3,
+                 voc_idx_f, nox_idx_f, hcho_ppb);
+    } else if (g_has_hcho_support) {
+        /* Sensor with HCHO but without PM1 (unusual combination) */
+        ESP_LOGI(TAG,
+                 "[%s] %s %s | 🌡️ %.1f°C | 💧 %.1f%% | 🌫️ PM2.5: %.1fµg/m³ | "
+                 "🌬️ VOC: %.1f | ⚠️ NOx: %.1f | 🧪 HCHO: %u ppb",
+                 g_sensor_name, status_icon, status_text,
+                 temp_celsius, humidity_pct, pm2_5_ugm3,
+                 voc_idx_f, nox_idx_f, hcho_ppb);
+    } else {
+        /* Standard SEN66 mode: CO2 instead of HCHO, no PM1 */
+        ESP_LOGI(TAG,
+                 "[%s] %s %s | 🌡️ %.1f°C | 💧 %.1f%% | 🌫️ PM2.5: %.1fµg/m³ | "
+                 "🌬️ VOC: %.1f | ⚠️ NOx: %.1f | 🔴 CO₂: %uppm",
+                 g_sensor_name, status_icon, status_text,
+                 temp_celsius, humidity_pct, pm2_5_ugm3,
+                 voc_idx_f, nox_idx_f, co2);
+    }
     /* Update display(s) with latest readings */
 
     #if USE_TFT_LCD
@@ -385,7 +468,7 @@ static bool sen66_read_and_display_data(void)
         
         char buf[64];
         
-        /* Layout constants */
+        /* Layout constants - Optimized for 240x320 screen */
         const int header_height = 40;
         const int status_bar_height = 24;
         const int left_margin = 10;
@@ -394,28 +477,58 @@ static bool sen66_read_and_display_data(void)
         const int char_h = 16;
         const int right_margin = 4;
         
-        /* Progress bar configuration */
+        /* Progress bar configuration - Increased for better visibility */
         const int pb_x = left_margin;
         const int pb_w = screen_w - (left_margin * 2);
-        const int pb_h = 10;
-        const int pb_gap = 6;
+        const int pb_h = 14;       /* Increased from 10 to 12 */
+        const int pb_gap = 6;      /* Increased from 6 to 8 */
         
         /* Sensor max values for progress bar scaling */
         const float pm25_max = 500.0f;
-        const float co2_max = 5000.0f;
-        const float voc_max = 500.0f;
         
-        /* Y positions */
-        const int y_temp = header_height + 8;
-        const int y_humid = y_temp + 28;
-        const int y_nox = y_humid + 28;
-        const int y_sep1 = y_nox + 26;
-        const int y_pm25 = y_sep1 + 8;
-        const int y_pb_pm25 = y_pm25 + char_h + pb_gap;
-        const int y_co2 = y_pb_pm25 + pb_h + 12;
-        const int y_pb_co2 = y_co2 + char_h + pb_gap;
-        const int y_sep2 = y_pb_co2 + pb_h + 10;
-        const int y_voc = y_sep2 + 8;
+        /* Y positions - Adaptive layout based on sensor type */
+        int basic_row_gap, sep_gap, air_quality_gap;  // 先声明变量
+        if (g_has_pm1_support) {
+            basic_row_gap = 24;                        // SEN68紧凑模式
+            sep_gap = 20;
+            air_quality_gap = 6;
+        } else {
+            basic_row_gap = 30;                        // SEN66标准模式
+            sep_gap = 24;
+            air_quality_gap = 10;
+        }
+        const int y_temp = header_height + 6;          /* Zone 1: Basic parameters */
+        const int y_humid = y_temp + basic_row_gap;   /* Row 2: Humidity */
+        const int y_nox = y_humid + basic_row_gap;    /* Row 3: NOx */
+        
+        /* ===== SEPARATOR: Basic vs Air Quality Parameters ===== */
+        const int y_sep1 = y_nox + sep_gap;           /* Separator after basic params */
+        
+        int y_pm1 = 0, y_pb_pm1 = 0, y_pm25 = 0, y_pb_pm25 = 0, y_voc = 0;
+        int y_hcho = 0, y_pb_hcho = 0, y_co2 = 0, y_pb_co2 = 0;
+
+        if (g_has_pm1_support) {
+            y_pm1 = y_sep1 + 6;        // 赋予实际值
+            y_pb_pm1 = y_pm1 + char_h + pb_gap;
+            y_pm25 = y_pb_pm1 + pb_h + 10;
+        } else {
+            y_pm25 = y_sep1 + 8;
+        }
+        y_pb_pm25 = y_pm25 + char_h + pb_gap;
+        // int y_hcho, y_pb_hcho, y_co2, y_pb_co2;      // 先声明
+        float hcho_max = 0, co2_max = 0;              // 先初始化
+        if (g_has_hcho_support) {
+            y_hcho = y_pb_pm25 + pb_h + air_quality_gap;
+            y_pb_hcho = y_hcho + char_h + pb_gap;
+            y_voc = y_pb_hcho + pb_h + air_quality_gap;
+            hcho_max = 300.0f;                        // SEN68: HCHO最大300ppb
+        } else {
+            y_co2 = y_pb_pm25 + pb_h + air_quality_gap;
+            y_pb_co2 = y_co2 + char_h + pb_gap;
+            y_voc = y_pb_co2 + pb_h + air_quality_gap;
+            co2_max = 5000.0f;                        // SEN66: CO2最大5000ppm
+        }
+        
         const int y_pb_voc = y_voc + char_h + pb_gap;
         const int status_y = tft_get_height() - status_bar_height;
 
@@ -426,19 +539,36 @@ static bool sen66_read_and_display_data(void)
                                                TEMP_DANGER_MAX, true);  /* Inverted: comfort range */
         uint16_t color_humid = get_level_color(humidity_pct, HUMID_NORMAL_MIN, HUMID_NORMAL_MAX, 
                                                HUMID_DANGER_MAX, true); /* Inverted: health range */
-        uint16_t color_nox   = get_level_color(nox_idx, 0, NOX_NORMAL_MAX, 
+        uint16_t color_nox   = get_level_color(nox_idx_f, 0, NOX_NORMAL_MAX, 
                                                NOX_WARNING_MAX, false); /* Normal: high is bad */
         uint16_t color_pm25  = get_level_color(pm2_5_ugm3, 0, PM25_NORMAL_MAX, 
                                                PM25_WARNING_MAX, false); /* Normal: high is bad */
-        uint16_t color_co2   = get_level_color((float)co2, 0, CO2_NORMAL_MAX, 
-                                               CO2_WARNING_MAX, false); /* Normal: high is bad */
-        uint16_t color_voc   = get_level_color(voc_idx, 0, VOC_NORMAL_MAX, 
+                                               
+        uint16_t color_hcho = TFT_BLUE, color_co2 = TFT_BLUE;  // 默认值
+        if (g_has_hcho_support) {
+            color_hcho = get_level_color((float)hcho_ppb, 0, HCHO_NORMAL_MAX,
+                                        HCHO_WARNING_MAX, false);
+        } else {
+            color_co2 = get_level_color((float)co2, 0, CO2_NORMAL_MAX, 
+                                        CO2_WARNING_MAX, false);
+        }  
+        
+        uint16_t color_voc   = get_level_color(voc_idx_f, 0, VOC_NORMAL_MAX, 
                                                VOC_WARNING_MAX, false); /* Normal: high is bad */
+                                               
+        uint16_t color_pm1 = TFT_BLUE;              // 默认蓝色
+        if (g_has_pm1_support) {
+            color_pm1 = get_level_color(pm1_ugm3, 0, PM1_NORMAL_MAX, 
+                                    PM1_WARNING_MAX, false);
+        }  
         
         /* Calculate global alert level for status bar */
         int global_level = get_global_alert_level(
-            temp_celsius, humidity_pct, nox_idx, 
-            pm2_5_ugm3, co2, voc_idx
+            temp_celsius, humidity_pct, nox_idx_f, 
+            pm2_5_ugm3, 
+            g_has_hcho_support ? hcho_ppb : co2,  // ← SEN68传HCHO，SEN66传CO2
+            voc_idx_f,
+            g_has_hcho_support
         );
 
         if (first_draw) {
@@ -455,23 +585,39 @@ static bool sen66_read_and_display_data(void)
             
             tft_draw_string("NOx:", left_margin, y_nox, color_nox, TFT_BG_COLOR, 2);
             
+            if (g_has_pm1_support) {
+                tft_draw_string("PM1.0:", left_margin, y_pm1, color_pm1, TFT_BG_COLOR, 2);
+                tft_draw_string("ug/m3", screen_w - 5 * char_w - right_margin, y_pm1, color_pm1, TFT_BG_COLOR, 2);
+            }
+            
+            /* ===== SEPARATOR: Basic vs Air Quality Parameters ===== */
             tft_fill_rect(8, y_sep1, screen_w - 16, 2, TFT_DARKGRAY);
             
             /* === Zone 2: Air quality (with progress bars) === */
             tft_draw_string("PM2.5:", left_margin, y_pm25, color_pm25, TFT_BG_COLOR, 2);
             tft_draw_string("ug/m3", screen_w - 5 * char_w - right_margin, y_pm25, color_pm25, TFT_BG_COLOR, 2);
             
-            tft_draw_string("CO2:", left_margin, y_co2, color_co2, TFT_BG_COLOR, 2);
-            tft_draw_string("ppm", screen_w - 3 * char_w - right_margin, y_co2, color_co2, TFT_BG_COLOR, 2);
-            
-            tft_fill_rect(8, y_sep2, screen_w - 16, 2, TFT_DARKGRAY);
+            if (g_has_hcho_support) {
+                tft_draw_string("HCHO:", left_margin, y_hcho, color_hcho, TFT_BG_COLOR, 2);
+                tft_draw_string("ppb", screen_w - 3 * char_w - right_margin, y_hcho, color_hcho, TFT_BG_COLOR, 2);
+            } else {
+                tft_draw_string("CO2:", left_margin, y_co2, color_co2, TFT_BG_COLOR, 2);
+                tft_draw_string("ppm", screen_w - 3 * char_w - right_margin, y_co2, color_co2, TFT_BG_COLOR, 2);
+            }
             
             /* === Zone 3: Gas sensor (with progress bar) === */
             tft_draw_string("VOC:", left_margin, y_voc, color_voc, TFT_BG_COLOR, 2);
             
             /* Draw progress bar backgrounds */
             tft_fill_rect(pb_x, y_pb_pm25, pb_w, pb_h, TFT_DARKGRAY);
-            tft_fill_rect(pb_x, y_pb_co2, pb_w, pb_h, TFT_DARKGRAY);
+            if (g_has_pm1_support) {
+                tft_fill_rect(pb_x, y_pb_pm1, pb_w, pb_h, TFT_DARKGRAY);    // PM1进度条 (SEN68)
+            }
+            if (g_has_hcho_support) {
+                tft_fill_rect(pb_x, y_pb_hcho, pb_w, pb_h, TFT_DARKGRAY);  // HCHO进度条 (SEN68)
+            } else {
+                tft_fill_rect(pb_x, y_pb_co2, pb_w, pb_h, TFT_DARKGRAY);   // CO2进度条 (SEN66)
+            }
             tft_fill_rect(pb_x, y_pb_voc, pb_w, pb_h, TFT_DARKGRAY);
             
             first_draw = false;
@@ -484,7 +630,11 @@ static bool sen66_read_and_display_data(void)
         const int val_x_humid = left_margin + 85;
         const int val_x_nox   = left_margin + 85;
         const int val_x_pm25  = left_margin + 90;
+        
+        #if !HAS_HCHO_SUPPORT
         const int val_x_co2   = left_margin + 85;
+        #endif
+        
         const int val_x_voc   = left_margin + 85;
         
         /* === Update Zone 1 values with dynamic colors === */
@@ -496,7 +646,6 @@ static bool sen66_read_and_display_data(void)
         tft_draw_string(buf, val_x_temp, y_temp, color_temp, TFT_BG_COLOR, 2);
         tft_draw_string("C", screen_w - 1 * char_w - right_margin, y_temp, color_temp, TFT_BG_COLOR, 2);
 
-        /* 修改后 */
         /* Humidity label and unit with level-based color */
         tft_draw_string("Hum:", left_margin, y_humid, color_humid, TFT_BG_COLOR, 2);
         tft_fill_rect(val_x_humid, y_humid, 6 * char_w, char_h, TFT_BG_COLOR);
@@ -507,9 +656,16 @@ static bool sen66_read_and_display_data(void)
         /* NOx label with level-based color */
         tft_draw_string("NOx:", left_margin, y_nox, color_nox, TFT_BG_COLOR, 2);
         tft_fill_rect(val_x_nox, y_nox, 6 * char_w, char_h, TFT_BG_COLOR);
-        snprintf(buf, sizeof(buf), "%6.1f", nox_idx);
+        snprintf(buf, sizeof(buf), "%6.1f", nox_idx_f);
         tft_draw_string(buf, val_x_nox, y_nox, color_nox, TFT_BG_COLOR, 2);
-
+        
+        if (g_has_pm1_support) {
+            tft_draw_string("PM1.0:", left_margin, y_pm1, color_pm1, TFT_BG_COLOR, 2);
+            tft_fill_rect(left_margin + 85, y_pm1, 6 * char_w, char_h, TFT_BG_COLOR);
+            snprintf(buf, sizeof(buf), "%6.1f", pm1_ugm3);
+            tft_draw_string(buf, left_margin + 85, y_pm1, color_pm1, TFT_BG_COLOR, 2);
+            tft_draw_string("ug/m3", screen_w - 5 * char_w - right_margin, y_pm1, color_pm1, TFT_BG_COLOR, 2);
+        }
         /* === Update Zone 2 values with dynamic colors === */
         
         /* PM2.5 label and unit with level-based color */
@@ -519,18 +675,26 @@ static bool sen66_read_and_display_data(void)
         tft_draw_string(buf, val_x_pm25, y_pm25, color_pm25, TFT_BG_COLOR, 2);
         tft_draw_string("ug/m3", screen_w - 5 * char_w - right_margin, y_pm25, color_pm25, TFT_BG_COLOR, 2);
 
-        /* CO2 label and unit with level-based color (fixed coverage width) */
-        tft_draw_string("CO2:", left_margin, y_co2, color_co2, TFT_BG_COLOR, 2);
-        tft_fill_rect(val_x_co2, y_co2, 6 * char_w, char_h, TFT_BG_COLOR);  /* ✅ 增加清除宽度 */
-        snprintf(buf, sizeof(buf), "%4u", co2);
-        tft_draw_string(buf, val_x_co2, y_co2, color_co2, TFT_BG_COLOR, 2);
-        tft_draw_string("ppm", screen_w - 3 * char_w - right_margin, y_co2, color_co2, TFT_BG_COLOR, 2);
+        if (g_has_hcho_support) {
+            tft_draw_string("HCHO:", left_margin, y_hcho, color_hcho, TFT_BG_COLOR, 2);
+            tft_fill_rect(left_margin + 85, y_hcho, 6 * char_w, char_h, TFT_BG_COLOR);
+            snprintf(buf, sizeof(buf), "%4u", hcho_ppb);
+            tft_draw_string(buf, left_margin + 85, y_hcho, color_hcho, TFT_BG_COLOR, 2);
+            tft_draw_string("ppb", screen_w - 3 * char_w - right_margin, y_hcho, color_hcho, TFT_BG_COLOR, 2);
+        } else {
+            tft_draw_string("CO2:", left_margin, y_co2, color_co2, TFT_BG_COLOR, 2);
+            tft_fill_rect(val_x_co2, y_co2, 6 * char_w, char_h, TFT_BG_COLOR);
+            snprintf(buf, sizeof(buf), "%4u", co2);
+            tft_draw_string(buf, val_x_co2, y_co2, color_co2, TFT_BG_COLOR, 2);
+            tft_draw_string("ppm", screen_w - 3 * char_w - right_margin, y_co2, color_co2, TFT_BG_COLOR, 2);
+        }
+        
         /* === Update Zone 3 value with dynamic color === */
         
         /* VOC label with level-based color */
         tft_draw_string("VOC:", left_margin, y_voc, color_voc, TFT_BG_COLOR, 2);
         tft_fill_rect(val_x_voc, y_voc, 6 * char_w, char_h, TFT_BG_COLOR);
-        snprintf(buf, sizeof(buf), "%6.1f", voc_idx);
+        snprintf(buf, sizeof(buf), "%6.1f", voc_idx_f);
         tft_draw_string(buf, val_x_voc, y_voc, color_voc, TFT_BG_COLOR, 2);
 
         /* ===== UPDATE PROGRESS BARS WITH THREE-COLOR SYSTEM ===== */
@@ -547,8 +711,18 @@ static bool sen66_read_and_display_data(void)
             }
         }
         
-        /* CO2 Progress Bar - uses same color as value */
-        {
+        if (g_has_hcho_support) {
+            /* HCHO Progress Bar (SEN68 only) */
+            int hcho_pct = (int)(((float)hcho_ppb / hcho_max) * 100);
+            if (hcho_pct > 100) hcho_pct = 100;
+            int hcho_fill_w = (pb_w * hcho_pct) / 100;
+            
+            tft_fill_rect(pb_x, y_pb_hcho, pb_w, pb_h, TFT_DARKGRAY);
+            if (hcho_fill_w > 0) {
+                tft_fill_rect(pb_x, y_pb_hcho, hcho_fill_w, pb_h, color_hcho);
+            }
+        } else {
+            /* CO2 Progress Bar (SEN66 only) */
             int co2_pct = (int)(((float)co2 / co2_max) * 100);
             if (co2_pct > 100) co2_pct = 100;
             int co2_fill_w = (pb_w * co2_pct) / 100;
@@ -561,7 +735,7 @@ static bool sen66_read_and_display_data(void)
         
         /* VOC Progress Bar - uses same color as value */
         {
-            int voc_pct = (int)((voc_idx / voc_max) * 100);
+            int voc_pct = (int)((voc_idx_f / 500.0f) * 100);
             if (voc_pct > 100) voc_pct = 100;
             int voc_fill_w = (pb_w * voc_pct) / 100;
             
@@ -607,8 +781,8 @@ static bool sen66_read_and_display_data(void)
         humidity_pct,
         pm2_5_ugm3,
         co2,
-        voc_idx,
-        nox_idx,
+        voc_idx_f,
+        nox_idx_f,
         is_alert
     );
     #endif
@@ -630,7 +804,16 @@ void app_main(void)
         
         tft_fill_screen(TFT_BG_COLOR);
 
-        tft_draw_string("ESP32", 5, 3, TFT_CYAN, TFT_BG_COLOR, 2);
+        /* 第1行：主标题 + 传感器名称 */
+        tft_draw_string("ESP32 ", 5, 3, TFT_CYAN, TFT_BG_COLOR, 2);
+        /*                     ↑ 空格分隔 */
+        {
+            const char* sensor_name = g_sensor_name;  /* Runtime detected: "SEN68" or "SEN66" */
+            int name_len = strlen(sensor_name);     /* 动态计算长度 */
+            int x_sensor = tft_get_width() - (name_len * 12) - 5;  /* 自适应屏幕宽度 */
+            
+            tft_draw_string(sensor_name, x_sensor, 3, TFT_GREEN, TFT_BG_COLOR, 2);
+        }
         tft_draw_string("@FELLOWES", tft_get_width() - 8 * 6 - 5, 22, TFT_YELLOW, TFT_BG_COLOR, 1);
         tft_draw_string("Environment Monitor", 5, 22, TFT_WHITE, TFT_BG_COLOR, 1);
 
@@ -640,7 +823,7 @@ void app_main(void)
     }
 #endif
 
-    ESP_LOGI(TAG, "Setting up I2C for SEN66 sensor...");
+    ESP_LOGI(TAG, "Setting up I2C for %s sensor...", g_sensor_name);
     esp_err_t err = i2c_manager_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "❌ Failed to initialize I2C bus! Error: 0x%x", err);
@@ -648,13 +831,17 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "✅ I2C bus initialized successfully");
 
+    /* Initialize I2C HAL layer (uses sensirion_i2c_hal_custom.c) */
     sensirion_i2c_hal_init();
-    sen66_init_sensor();
+    
+    /* Initialize the selected sensor (SEN66 or SEN68) */
+    init_environmental_sensor();
 
-    ESP_LOGI(TAG, "Starting main loop - reading sensors every %d ms...", SEN66_READ_PERIOD_MS);
+    ESP_LOGI(TAG, "Starting main loop - reading %s every %d ms...", 
+             g_sensor_name, SENSOR_READ_PERIOD_MS);
 
     while (1) {
-        bool alert_active = sen66_read_and_display_data();
+        bool alert_active = read_and_display_sensor_data();
 
         if (alert_active) {
             s_alert_blink_counter++;
