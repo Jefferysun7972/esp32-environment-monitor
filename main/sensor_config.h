@@ -1,81 +1,71 @@
 /*
  * Unified Sensor Configuration Header
  * 
- * Automatically selects between SEN66 and SEN68 based on menuconfig
- * Provides unified API macros for transparent sensor switching
+ * Runtime automatic detection of SEN66 vs SEN68 sensor type
+ * Uses Get Product Name command (0xD014) to identify sensor at startup
  * 
  * Usage:
  *   1. Include this file BEFORE any sensor-specific headers
- *   2. Use sensor_*() macros instead of direct sen66_/sen68_ calls
- *   3. Compile with CONFIG_SENSOR_TYPE_SEN66 or CONFIG_SENSOR_TYPE_SEN68
+ *   2. Call detect_sensor_type() during initialization
+ *   3. Use global variables: g_is_sen68_sensor, g_sensor_name
+ *   4. Check feature flags: g_has_pm1_support, g_has_hcho_support
  */
 
 #ifndef SENSOR_CONFIG_H
 #define SENSOR_CONFIG_H
 
-#include "sdkconfig.h"
+#include <string.h>
+#include "esp_log.h"
 
-/* ============================================ */
-/* SENSOR TYPE DETECTION                        */
-/* Based on CONFIG_SENSOR_TYPE from Kconfig     */
-/* ============================================ */
+/* Include BOTH sensor headers for runtime switching */
+#include "sen66_i2c.h"
+#include "sen68_i2c.h"
 
-#ifdef CONFIG_SENSOR_TYPE_SEN68
-    /* ======== SEN68 Advanced Sensor ======== */
-    /* Features: All SEN66 + PM1.0 + HCHO */
-    
-    #define USE_SEN68_SENSOR        1
-    #define USE_SEN66_SENSOR        0
-    
-    #define SENSOR_NAME             "SEN68"
-    #define SENSOR_I2C_ADDR         0x6B
-    
-    /* Include SEN68 specific headers */
-    #include "sen68_i2c.h"
-    
-    /* Feature flags */
-    #define HAS_PM1_SUPPORT         1       /* PM1.0 ultrafine particles */
-    #define HAS_HCHO_SUPPORT        1       /* HCHO formaldehyde in ppb */
-    
-    /* Unified API macros (map to SEN68 functions) */
-    #define sensor_device_reset()              sen68_device_reset()
-    #define sensor_start_measurement()         sen68_start_continuous_measurement()
-    #define sensor_stop_measurement()          sen68_stop_continuous_measurement()
-    #define sensor_read_measured_values(...)   \
-            sen68_read_measured_values_as_integers(__VA_ARGS__)
-            
-#else
-    /* ======== SEN66 Standard Sensor (Default) ======== */
-    /* Features: Temp, Humid, PM2.5/4/10, VOC, NOx, CO2 */
-    
-    #define USE_SEN68_SENSOR        0
-    #define USE_SEN66_SENSOR        1
-    
-    #define SENSOR_NAME             "SEN66"
-    #define SENSOR_I2C_ADDR         0x6B
-    
-    /* Include SEN66 specific headers */
-    #include "sen66_i2c.h"
-    
-    /* Feature flags */
-    #define HAS_PM1_SUPPORT         0       /* Not available on SEN66 */
-    #define HAS_HCHO_SUPPORT        0       /* Not available on SEN66 */
-    
-    /* Unified API macros (map to SEN66 functions) */
-    #define sensor_device_reset()              sen66_device_reset()
-    #define sensor_start_measurement()         sen66_start_continuous_measurement()
-    #define sensor_stop_measurement()          sen66_stop_continuous_measurement()
-    #define sensor_read_measured_values(...)   \
-            sen66_read_measured_values_as_integers(__VA_ARGS__)
-            
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+/* ============================================ */
+/* RUNTIME SENSOR DETECTION GLOBALS            */
+/* Set by detect_sensor_type() at runtime      */
+/* ============================================ */
+extern int g_is_sen68_sensor;           /* 1=SEN68 detected, 0=SEN66 detected */
+extern const char* g_sensor_name;       /* "SEN68" or "SEN66" */
+extern int g_has_pm1_support;          /* PM1.0 ultrafine particles */
+extern int g_has_hcho_support;         /* HCHO formaldehyde in ppb */
+extern int g_has_co2_support;          /* CO2 ppm (SEN66 only) */
+
+/* ============================================ */
+/* SENSOR DETECTION FUNCTION                   */
+/* Call once during initialization             */
+/* ============================================ */
+int detect_sensor_type(void);
+
+/* ============================================ */
+/* UNIFIED API FUNCTIONS                       */
+/* Automatically route to correct sensor       */
+/* Based on runtime detection result           */
+/* ============================================ */
+int16_t sensor_device_reset(void);
+int16_t sensor_start_measurement(void);
+int16_t sensor_stop_measurement(void);
+int16_t sensor_get_product_name(int8_t* name, uint16_t size);
+int16_t sensor_read_measured_values(uint16_t* pm1p0, uint16_t* pm2p5,
+                                     uint16_t* pm4p0, uint16_t* pm10p0,
+                                     int16_t* humidity, int16_t* temperature,
+                                     int16_t* voc_index, int16_t* nox_index,
+                                     uint16_t* hcho_or_co2);
 
 /* ============================================ */
 /* COMMON CONSTANTS (shared by both sensors)    */
 /* ============================================ */
-
+#define SENSOR_I2C_ADDR             0x6B
 #define SENSOR_READ_PERIOD_MS        5000    /* Read interval: 5 seconds */
 #define SENSOR_WARMUP_DELAY_MS       15000   /* Warm-up time: 15 seconds */
 #define SENSOR_WARMUP_READINGS       3       /* Skip first N readings */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* SENSOR_CONFIG_H */

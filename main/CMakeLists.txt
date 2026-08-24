@@ -1,5 +1,6 @@
 idf_component_register(
     SRCS "blink_example_main.c"
+        "sensor_detect.c"
     INCLUDE_DIRS "."
     REQUIRES
         i2c_manager
