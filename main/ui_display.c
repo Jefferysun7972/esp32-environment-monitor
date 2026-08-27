@@ -72,8 +72,15 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
 
     int y_temp  = UI_HEADER_HEIGHT + 6;
     int y_humid = y_temp + basic_row_gap;
-    int y_nox   = y_humid + basic_row_gap;
-    int y_sep1  = y_nox + sep_gap;
+    int y_nox = 0;
+    int y_sep1;
+
+    if (g_has_nox_support) {
+        y_nox = y_humid + basic_row_gap;
+        y_sep1 = y_nox + sep_gap;
+    } else {
+        y_sep1 = y_humid + sep_gap;
+    }
 
     int y_pm1 = 0, y_pb_pm1 = 0;
     int y_pm25, y_pb_pm25;
@@ -97,10 +104,12 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
         y_hcho = y_pb_pm25 + UI_PROGRESS_BAR_H + air_quality_gap;
         y_pb_hcho = y_hcho + UI_CHAR_H + UI_PROGRESS_BAR_GAP;
         y_voc = y_pb_hcho + UI_PROGRESS_BAR_H + air_quality_gap;
-    } else {
+    } else if (g_has_co2_support) {
         y_co2 = y_pb_pm25 + UI_PROGRESS_BAR_H + air_quality_gap;
         y_pb_co2 = y_co2 + UI_CHAR_H + UI_PROGRESS_BAR_GAP;
         y_voc = y_pb_co2 + UI_PROGRESS_BAR_H + air_quality_gap;
+    } else {
+        y_voc = y_pb_pm25 + UI_PROGRESS_BAR_H + air_quality_gap;
     }
     y_pb_voc = y_voc + UI_CHAR_H + UI_PROGRESS_BAR_GAP;
 
@@ -118,7 +127,9 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
         tft_draw_string("Hum:", UI_LEFT_MARGIN, y_humid, d->color_humid, TFT_BG_COLOR, 2);
         tft_draw_string("%", screen_w - 1 * UI_CHAR_W - UI_RIGHT_MARGIN, y_humid, d->color_humid, TFT_BG_COLOR, 2);
 
-        tft_draw_string("NOx:", UI_LEFT_MARGIN, y_nox, d->color_nox, TFT_BG_COLOR, 2);
+        if (g_has_nox_support) {
+            tft_draw_string("NOx:", UI_LEFT_MARGIN, y_nox, d->color_nox, TFT_BG_COLOR, 2);
+        }
 
         if (g_has_pm1_support) {
             tft_draw_string("PM1.0:", UI_LEFT_MARGIN, y_pm1, d->color_pm1, TFT_BG_COLOR, 2);
@@ -135,7 +146,7 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
         if (g_has_hcho_support) {
             tft_draw_string("HCHO:", UI_LEFT_MARGIN, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
             tft_draw_string("ppb", screen_w - 3 * UI_CHAR_W - UI_RIGHT_MARGIN, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
-        } else {
+        } else if (g_has_co2_support) {
             tft_draw_string("CO2:", UI_LEFT_MARGIN, y_co2, d->color_co2, TFT_BG_COLOR, 2);
             tft_draw_string("ppm", screen_w - 3 * UI_CHAR_W - UI_RIGHT_MARGIN, y_co2, d->color_co2, TFT_BG_COLOR, 2);
         }
@@ -150,7 +161,7 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
         }
         if (g_has_hcho_support) {
             tft_fill_rect(pb_x, y_pb_hcho, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
-        } else {
+        } else if (g_has_co2_support) {
             tft_fill_rect(pb_x, y_pb_co2, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
         }
         tft_fill_rect(pb_x, y_pb_voc, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
@@ -177,10 +188,12 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
     tft_draw_string("%", screen_w - 1 * UI_CHAR_W - UI_RIGHT_MARGIN, y_humid, d->color_humid, TFT_BG_COLOR, 2);
 
     /* NOx */
-    tft_draw_string("NOx:", UI_LEFT_MARGIN, y_nox, d->color_nox, TFT_BG_COLOR, 2);
-    tft_fill_rect(val_x_basic, y_nox, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
-    snprintf(buf, sizeof(buf), "%6.1f", d->nox_idx_f);
-    tft_draw_string(buf, val_x_basic, y_nox, d->color_nox, TFT_BG_COLOR, 2);
+    if (g_has_nox_support) {
+        tft_draw_string("NOx:", UI_LEFT_MARGIN, y_nox, d->color_nox, TFT_BG_COLOR, 2);
+        tft_fill_rect(val_x_basic, y_nox, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+        snprintf(buf, sizeof(buf), "%6.1f", d->nox_idx_f);
+        tft_draw_string(buf, val_x_basic, y_nox, d->color_nox, TFT_BG_COLOR, 2);
+    }
 
     /* PM1.0 (SEN68 only) */
     if (g_has_pm1_support) {
@@ -201,19 +214,23 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
         tft_draw_string("ug/m3", screen_w - 5 * UI_CHAR_W - UI_RIGHT_MARGIN, y_pm25, d->color_pm25, TFT_BG_COLOR, 2);
     }
 
-    /* HCHO or CO2 */
+    /* HCHO or CO2 Progress Bar */
     if (g_has_hcho_support) {
-        tft_draw_string("HCHO:", UI_LEFT_MARGIN, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
-        tft_fill_rect(val_x_basic, y_hcho, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
-        snprintf(buf, sizeof(buf), "%4u", d->hcho_ppb);
-        tft_draw_string(buf, val_x_basic, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
-        tft_draw_string("ppb", screen_w - 3 * UI_CHAR_W - UI_RIGHT_MARGIN, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
-    } else {
-        tft_draw_string("CO2:", UI_LEFT_MARGIN, y_co2, d->color_co2, TFT_BG_COLOR, 2);
-        tft_fill_rect(val_x_basic, y_co2, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
-        snprintf(buf, sizeof(buf), "%4u", d->co2);
-        tft_draw_string(buf, val_x_basic, y_co2, d->color_co2, TFT_BG_COLOR, 2);
-        tft_draw_string("ppm", screen_w - 3 * UI_CHAR_W - UI_RIGHT_MARGIN, y_co2, d->color_co2, TFT_BG_COLOR, 2);
+        int hcho_pct = (int)(((float)d->hcho_ppb / hcho_max) * 100);
+        if (hcho_pct > 100) hcho_pct = 100;
+        int hcho_fill_w = (pb_w * hcho_pct) / 100;
+        tft_fill_rect(pb_x, y_pb_hcho, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
+        if (hcho_fill_w > 0) {
+            tft_fill_rect(pb_x, y_pb_hcho, hcho_fill_w, UI_PROGRESS_BAR_H, d->color_hcho);
+        }
+    } else if (g_has_co2_support) {
+        int co2_pct = (int)(((float)d->co2 / co2_max) * 100);
+        if (co2_pct > 100) co2_pct = 100;
+        int co2_fill_w = (pb_w * co2_pct) / 100;
+        tft_fill_rect(pb_x, y_pb_co2, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
+        if (co2_fill_w > 0) {
+            tft_fill_rect(pb_x, y_pb_co2, co2_fill_w, UI_PROGRESS_BAR_H, d->color_co2);
+        }
     }
 
     /* VOC */
@@ -255,7 +272,7 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
         if (hcho_fill_w > 0) {
             tft_fill_rect(pb_x, y_pb_hcho, hcho_fill_w, UI_PROGRESS_BAR_H, d->color_hcho);
         }
-    } else {
+    } else if (g_has_co2_support) {
         int co2_pct = (int)(((float)d->co2 / co2_max) * 100);
         if (co2_pct > 100) co2_pct = 100;
         int co2_fill_w = (pb_w * co2_pct) / 100;

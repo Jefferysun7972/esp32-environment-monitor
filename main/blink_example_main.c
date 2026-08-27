@@ -1,9 +1,9 @@
 /*
- * ESP32 Environment Monitor with Dual Sensor Support
+ * ESP32 Environment Monitor with Multi-Sensor Support
  * 
  * Features:
  * - LED blinking on GPIO2 (D2) with configurable period
- * - Dual sensor support: SEN66 / SEN68 with runtime auto-detection
+ * - Multi-sensor support: SEN54 / SEN66 / SEN68 with runtime auto-detection
  * - Three-color level system: BLUE (normal) / ORANGE (warning) / RED (danger)
  * - 240x320 TFT-LCD display with optimized layout and progress bars
  * - Modular architecture: config, alert, UI separated into dedicated modules
@@ -208,16 +208,20 @@ static bool read_and_display_sensor_data(void)
     const char* status_icon = is_alert ? "!" : "*";
     const char* status_text = is_alert ? "ALERT" : "NORMAL";
 
-    if (g_has_pm1_support && g_has_hcho_support) {
+    if (g_has_hcho_support) {
         ESP_LOGI(TAG, "[%s] %s %s | T:%.1fC | H:%.1f%% | PM2.5:%.1f | PM1:%.1f | VOC:%.1f | NOx:%.1f | HCHO:%u",
                  g_sensor_name, status_icon, status_text,
                  temp_celsius, humidity_pct, pm2_5_ugm3, pm1_ugm3,
                  voc_idx_f, nox_idx_f, hcho_ppb);
-    } else {
+    } else if (g_has_co2_support) {
         ESP_LOGI(TAG, "[%s] %s %s | T:%.1fC | H:%.1f%% | PM2.5:%.1f | VOC:%.1f | NOx:%.1f | CO2:%u",
                  g_sensor_name, status_icon, status_text,
                  temp_celsius, humidity_pct, pm2_5_ugm3,
                  voc_idx_f, nox_idx_f, co2);
+    } else {
+        ESP_LOGI(TAG, "[%s] %s %s | T:%.1fC | H:%.1f%% | PM2.5:%.1f | PM1:%.1f | VOC:%.1f",
+                 g_sensor_name, status_icon, status_text,
+                 temp_celsius, humidity_pct, pm2_5_ugm3, pm1_ugm3, voc_idx_f);
     }
 
 #if USE_TFT_LCD
@@ -233,15 +237,17 @@ static bool read_and_display_sensor_data(void)
             .hcho_ppb = hcho_ppb,
             .color_temp  = alert_get_color(temp_celsius, TEMP_NORMAL_MIN, TEMP_NORMAL_MAX, TEMP_DANGER_MAX, true),
             .color_humid = alert_get_color(humidity_pct, HUMID_NORMAL_MIN, HUMID_NORMAL_MAX, HUMID_DANGER_MAX, true),
-            .color_nox   = alert_get_color(nox_idx_f, 0, NOX_NORMAL_MAX, NOX_WARNING_MAX, false),
+            .color_nox   = g_has_nox_support ? alert_get_color(nox_idx_f, 0, NOX_NORMAL_MAX, NOX_WARNING_MAX, false) : TFT_BLUE,
             .color_voc   = alert_get_color(voc_idx_f, 0, VOC_NORMAL_MAX, VOC_WARNING_MAX, false),
             .color_pm25  = alert_get_color(pm2_5_ugm3, 0, PM25_NORMAL_MAX, PM25_WARNING_MAX, false),
             .color_pm1   = g_has_pm1_support ? alert_get_color(pm1_ugm3, 0, PM1_NORMAL_MAX, PM1_WARNING_MAX, false) : TFT_BLUE,
             .color_co2   = alert_get_color((float)co2, 0, CO2_NORMAL_MAX, CO2_WARNING_MAX, false),
             .color_hcho  = alert_get_color((float)hcho_ppb, 0, HCHO_NORMAL_MAX, HCHO_WARNING_MAX, false),
-            .global_level = alert_get_global_level(temp_celsius, humidity_pct, nox_idx_f,
+            .global_level = alert_get_global_level(temp_celsius, humidity_pct,
+                                                    g_has_nox_support ? nox_idx_f : 0.0f,
                                                     pm2_5_ugm3,
-                                                    g_has_hcho_support ? hcho_ppb : co2,
+                                                    g_has_hcho_support ? hcho_ppb :
+                                                        (g_has_co2_support ? co2 : 0),
                                                     voc_idx_f, g_has_hcho_support),
         };
         ui_draw_sensor_screen(&d);
