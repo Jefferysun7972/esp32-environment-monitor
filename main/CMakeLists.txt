@@ -9,6 +9,7 @@ idf_component_register(
         embedded-i2c-sen5x
         embedded-i2c-sen66
         embedded-i2c-sen68
+        uart_sensor
         oled_display
         tft_lcd
 )

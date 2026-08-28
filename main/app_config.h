@@ -9,6 +9,13 @@
 #define APP_CONFIG_H
 
 /* ============================================ */
+/* SENSOR SELECTION                            */
+/* Set to 1 to use UART multi-sensor module     */
+/* instead of I2C SEN54/SEN66/SEN68             */
+/* ============================================ */
+#define SENSOR_USE_UART             1
+
+/* ============================================ */
 /* I2C CONFIGURATION                           */
 /* ============================================ */
 #define I2C_MASTER_SCL_IO           22
@@ -58,6 +65,18 @@
 /* HCHO thresholds (ppb) - WHO indoor air quality guideline (SEN68 only) */
 #define HCHO_NORMAL_MAX    80.0f
 #define HCHO_WARNING_MAX   150.0f
+
+/* PM10 thresholds (ug/m3) - WHO air quality guideline */
+#define PM10_NORMAL_MAX     50.0f
+#define PM10_WARNING_MAX   100.0f
+
+/* Pressure thresholds (hPa) - Standard atmospheric */
+#define PRES_NORMAL_MIN    980.0f
+#define PRES_NORMAL_MAX   1030.0f
+
+/* AQ State thresholds (0-4) */
+#define AQ_NORMAL_MAX       2.0f
+#define AQ_WARNING_MAX      3.0f
 
 /* ============================================ */
 /* LED ALERT THRESHOLDS                        */

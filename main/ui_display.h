@@ -25,16 +25,22 @@ typedef struct {
     float voc_idx_f;
     float pm2_5_ugm3;
     float pm1_ugm3;
+    float pm10_ugm3;
+    float pressure_hpa;
     uint16_t co2;
     uint16_t hcho_ppb;
+    uint16_t aq_state;
     uint16_t color_temp;
     uint16_t color_humid;
     uint16_t color_nox;
     uint16_t color_voc;
     uint16_t color_pm25;
     uint16_t color_pm1;
+    uint16_t color_pm10;
     uint16_t color_co2;
     uint16_t color_hcho;
+    uint16_t color_pres;
+    uint16_t color_aq;
     int global_level;
 } ui_sensor_data_t;
 
