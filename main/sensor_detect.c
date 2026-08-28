@@ -20,11 +20,42 @@ int g_has_pm1_support = 0;              /* Default: no PM1.0 */
 int g_has_nox_support = 1;              /* Default: has NOx (SEN66/SEN68) */
 int g_has_hcho_support = 0;             /* Default: no HCHO */
 int g_has_co2_support = 1;              /* Default: has CO2 (SEN66) */
+int g_has_pm10_support = 0;             /* Default: no PM10 */
+int g_has_pressure_support = 0;         /* Default: no pressure */
+int g_has_aq_support = 0;               /* Default: no AQ state */
 
 /* ============================================ */
 /* SENSOR DETECTION FUNCTION                    */
 /* Call once during system initialization       */
 /* ============================================ */
+int detect_uart_sensor(void) {
+    ESP_LOGI(TAG, "Sensor configured as: **UART Multi-Sensor Module**");
+
+    g_sensor_type = SENSOR_UART;
+    g_sensor_name = "UART-MOD";
+    g_has_pm1_support = 1;
+    g_has_nox_support = 0;
+    g_has_hcho_support = 0;
+    g_has_co2_support = 1;
+    g_has_pm10_support = 1;
+    g_has_pressure_support = 1;
+    g_has_aq_support = 1;
+
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "Sensor Configuration:");
+    ESP_LOGI(TAG, "  Type:     %s", g_sensor_name);
+    ESP_LOGI(TAG, "  PM1.0:    %s", g_has_pm1_support ? "YES" : "NO");
+    ESP_LOGI(TAG, "  PM10:     %s", g_has_pm10_support ? "YES" : "NO");
+    ESP_LOGI(TAG, "  NOx:      %s", g_has_nox_support ? "YES" : "NO");
+    ESP_LOGI(TAG, "  HCHO:     %s", g_has_hcho_support ? "YES" : "NO");
+    ESP_LOGI(TAG, "  CO2:      %s", g_has_co2_support ? "YES" : "NO");
+    ESP_LOGI(TAG, "  Pressure: %s", g_has_pressure_support ? "YES" : "NO");
+    ESP_LOGI(TAG, "  AQ State: %s", g_has_aq_support ? "YES" : "NO");
+    ESP_LOGI(TAG, "========================================");
+
+    return 0;
+}
+
 int detect_sensor_type(void) {
     int8_t product_name[32] = {0};
     int16_t error = 0;

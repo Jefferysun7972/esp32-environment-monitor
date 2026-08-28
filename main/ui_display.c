@@ -57,8 +57,187 @@ void ui_draw_header(const char *sensor_name)
     tft_draw_string("Initializing...", 5, 42, TFT_YELLOW, TFT_BG_COLOR, 1);
 }
 
+/* ============================================ */
+/* UART SENSOR LAYOUT (compact, multi-parameter) */
+/* ============================================ */
+static void ui_draw_uart_sensor_screen(const ui_sensor_data_t *d)
+{
+    char buf[64];
+    int screen_w = tft_get_width();
+    int screen_h = tft_get_height();
+
+    int pb_x = UI_LEFT_MARGIN;
+    int pb_w = screen_w - (UI_LEFT_MARGIN * 2);
+
+    int row_gap = 20;
+
+    int y_temp  = UI_HEADER_HEIGHT + 6;
+    int y_humid = y_temp + row_gap;
+    int y_pres  = y_humid + row_gap;
+    int y_sep1  = y_pres + 16;
+
+    int y_pm1   = y_sep1 + 6;
+    int y_pm25  = y_pm1 + row_gap;
+    int y_pb_pm25 = y_pm25 + UI_CHAR_H + UI_PROGRESS_BAR_GAP;
+    int y_pm10  = y_pb_pm25 + UI_PROGRESS_BAR_H + 8;
+
+    int y_sep2  = y_pm10 + row_gap;
+
+    int y_co2   = y_sep2 + 6;
+    int y_pb_co2 = y_co2 + UI_CHAR_H + UI_PROGRESS_BAR_GAP;
+    int y_voc   = y_pb_co2 + UI_PROGRESS_BAR_H + 6;
+    int y_pb_voc = y_voc + UI_CHAR_H + UI_PROGRESS_BAR_GAP;
+
+    int status_y = screen_h - UI_STATUS_BAR_HEIGHT;
+
+    float co2_max = CO2_MAX_SCALE;
+    int val_x_basic = UI_LEFT_MARGIN + VAL_X_BASIC;
+    int val_x_pm = UI_LEFT_MARGIN + VAL_X_PM;
+
+    if (s_first_draw) {
+        tft_fill_rect(0, UI_HEADER_HEIGHT, screen_w,
+                      screen_h - UI_HEADER_HEIGHT - UI_STATUS_BAR_HEIGHT, TFT_BG_COLOR);
+
+        tft_draw_string("Temp:", UI_LEFT_MARGIN, y_temp, d->color_temp, TFT_BG_COLOR, 2);
+        tft_draw_string("C", screen_w - 1 * UI_CHAR_W - UI_RIGHT_MARGIN, y_temp, d->color_temp, TFT_BG_COLOR, 2);
+
+        tft_draw_string("Hum:", UI_LEFT_MARGIN, y_humid, d->color_humid, TFT_BG_COLOR, 2);
+        tft_draw_string("%", screen_w - 1 * UI_CHAR_W - UI_RIGHT_MARGIN, y_humid, d->color_humid, TFT_BG_COLOR, 2);
+
+        tft_draw_string("Pres:", UI_LEFT_MARGIN, y_pres, d->color_pres, TFT_BG_COLOR, 2);
+        tft_draw_string("hPa", screen_w - 3 * UI_CHAR_W - UI_RIGHT_MARGIN, y_pres, d->color_pres, TFT_BG_COLOR, 2);
+
+        tft_fill_rect(8, y_sep1, screen_w - 16, 2, TFT_DARKGRAY);
+
+        tft_draw_string("PM1.0:", UI_LEFT_MARGIN, y_pm1, d->color_pm1, TFT_BG_COLOR, 2);
+        tft_draw_string("ug/m3", screen_w - 5 * UI_CHAR_W - UI_RIGHT_MARGIN, y_pm1, d->color_pm1, TFT_BG_COLOR, 2);
+        tft_draw_string("PM2.5:", UI_LEFT_MARGIN, y_pm25, d->color_pm25, TFT_BG_COLOR, 2);
+        tft_draw_string("ug/m3", screen_w - 5 * UI_CHAR_W - UI_RIGHT_MARGIN, y_pm25, d->color_pm25, TFT_BG_COLOR, 2);
+
+        tft_draw_string("PM10:", UI_LEFT_MARGIN, y_pm10, d->color_pm10, TFT_BG_COLOR, 2);
+        tft_draw_string("ug/m3", screen_w - 5 * UI_CHAR_W - UI_RIGHT_MARGIN, y_pm10, d->color_pm10, TFT_BG_COLOR, 2);
+
+        tft_fill_rect(8, y_sep2, screen_w - 16, 2, TFT_DARKGRAY);
+
+        tft_draw_string("CO2:", UI_LEFT_MARGIN, y_co2, d->color_co2, TFT_BG_COLOR, 2);
+        tft_draw_string("ppm", screen_w - 3 * UI_CHAR_W - UI_RIGHT_MARGIN, y_co2, d->color_co2, TFT_BG_COLOR, 2);
+
+        tft_draw_string("VOC:", UI_LEFT_MARGIN, y_voc, d->color_voc, TFT_BG_COLOR, 2);
+
+        tft_fill_rect(pb_x, y_pb_pm25, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
+        tft_fill_rect(pb_x, y_pb_co2, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
+        tft_fill_rect(pb_x, y_pb_voc, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
+
+        s_first_draw = false;
+    }
+
+    /* === UPDATE MODE === */
+
+    tft_draw_string("Temp:", UI_LEFT_MARGIN, y_temp, d->color_temp, TFT_BG_COLOR, 2);
+    tft_fill_rect(val_x_basic, y_temp, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%6.1f", d->temp_celsius);
+    tft_draw_string(buf, val_x_basic, y_temp, d->color_temp, TFT_BG_COLOR, 2);
+
+    tft_draw_string("Hum:", UI_LEFT_MARGIN, y_humid, d->color_humid, TFT_BG_COLOR, 2);
+    tft_fill_rect(val_x_basic, y_humid, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%6.1f", d->humidity_pct);
+    tft_draw_string(buf, val_x_basic, y_humid, d->color_humid, TFT_BG_COLOR, 2);
+
+    tft_draw_string("Pres:", UI_LEFT_MARGIN, y_pres, d->color_pres, TFT_BG_COLOR, 2);
+    tft_fill_rect(val_x_basic, y_pres, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%6.1f", d->pressure_hpa);
+    tft_draw_string(buf, val_x_basic, y_pres, d->color_pres, TFT_BG_COLOR, 2);
+
+    tft_draw_string("PM1.0:", UI_LEFT_MARGIN, y_pm1, d->color_pm1, TFT_BG_COLOR, 2);
+    tft_fill_rect(val_x_basic, y_pm1, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%6.1f", d->pm1_ugm3);
+    tft_draw_string(buf, val_x_basic, y_pm1, d->color_pm1, TFT_BG_COLOR, 2);
+
+    tft_draw_string("PM2.5:", UI_LEFT_MARGIN, y_pm25, d->color_pm25, TFT_BG_COLOR, 2);
+    tft_fill_rect(val_x_pm, y_pm25, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%6.1f", d->pm2_5_ugm3);
+    tft_draw_string(buf, val_x_pm, y_pm25, d->color_pm25, TFT_BG_COLOR, 2);
+
+    tft_draw_string("PM10:", UI_LEFT_MARGIN, y_pm10, d->color_pm10, TFT_BG_COLOR, 2);
+    tft_fill_rect(val_x_basic, y_pm10, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%6.1f", d->pm10_ugm3);
+    tft_draw_string(buf, val_x_basic, y_pm10, d->color_pm10, TFT_BG_COLOR, 2);
+
+    tft_draw_string("CO2:", UI_LEFT_MARGIN, y_co2, d->color_co2, TFT_BG_COLOR, 2);
+    tft_fill_rect(val_x_basic, y_co2, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%6u", d->co2);
+    tft_draw_string(buf, val_x_basic, y_co2, d->color_co2, TFT_BG_COLOR, 2);
+
+    tft_draw_string("VOC:", UI_LEFT_MARGIN, y_voc, d->color_voc, TFT_BG_COLOR, 2);
+    tft_fill_rect(val_x_basic, y_voc, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%6.1f", d->voc_idx_f);
+    tft_draw_string(buf, val_x_basic, y_voc, d->color_voc, TFT_BG_COLOR, 2);
+
+    /* PM2.5 Progress Bar */
+    {
+        int pm25_pct = (int)((d->pm2_5_ugm3 / PM25_MAX_SCALE) * 100);
+        if (pm25_pct > 100) pm25_pct = 100;
+        int pm25_fill_w = (pb_w * pm25_pct) / 100;
+        tft_fill_rect(pb_x, y_pb_pm25, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
+        if (pm25_fill_w > 0) {
+            tft_fill_rect(pb_x, y_pb_pm25, pm25_fill_w, UI_PROGRESS_BAR_H, d->color_pm25);
+        }
+    }
+
+    /* CO2 Progress Bar */
+    {
+        int co2_pct = (int)(((float)d->co2 / co2_max) * 100);
+        if (co2_pct > 100) co2_pct = 100;
+        int co2_fill_w = (pb_w * co2_pct) / 100;
+        tft_fill_rect(pb_x, y_pb_co2, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
+        if (co2_fill_w > 0) {
+            tft_fill_rect(pb_x, y_pb_co2, co2_fill_w, UI_PROGRESS_BAR_H, d->color_co2);
+        }
+    }
+
+    /* VOC Progress Bar */
+    {
+        int voc_pct = (int)((d->voc_idx_f / VOC_MAX_SCALE) * 100);
+        if (voc_pct > 100) voc_pct = 100;
+        int voc_fill_w = (pb_w * voc_pct) / 100;
+        tft_fill_rect(pb_x, y_pb_voc, pb_w, UI_PROGRESS_BAR_H, TFT_DARKGRAY);
+        if (voc_fill_w > 0) {
+            tft_fill_rect(pb_x, y_pb_voc, voc_fill_w, UI_PROGRESS_BAR_H, d->color_voc);
+        }
+    }
+
+    /* Status Bar */
+    if (s_last_alert_state != d->global_level) {
+        switch (d->global_level) {
+            case 0:
+                tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, TFT_BLUE);
+                tft_draw_string("* NORMAL *", (screen_w - 10 * UI_CHAR_W) / 2 + 2, status_y + 5,
+                               TFT_WHITE, TFT_BLUE, 2);
+                break;
+            case 1:
+                tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, TFT_ORANGE);
+                tft_draw_string("* WARNING *", (screen_w - 11 * UI_CHAR_W) / 2 + 2, status_y + 5,
+                               TFT_WHITE, TFT_ORANGE, 2);
+                break;
+            case 2:
+                tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, TFT_RED);
+                tft_draw_string("* DANGER !", (screen_w - 11 * UI_CHAR_W) / 2 + 2, status_y + 5,
+                               TFT_WHITE, TFT_RED, 2);
+                break;
+            default:
+                break;
+        }
+        s_last_alert_state = d->global_level;
+    }
+}
+
 void ui_draw_sensor_screen(const ui_sensor_data_t *d)
 {
+    if (g_sensor_type == SENSOR_UART) {
+    ui_draw_uart_sensor_screen(d);
+    return;
+    }
+
     char buf[64];
     int screen_w = tft_get_width();
     int screen_h = tft_get_height();
@@ -293,27 +472,40 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
         }
     }
 
-    /* ===== STATUS BAR ===== */
-    if (s_last_alert_state != d->global_level) {
-        switch (d->global_level) {
+    /* Status Bar - AQ State */
+    if (s_last_alert_state != (int)d->aq_state) {
+        const char *aq_text;
+        uint16_t aq_bg;
+        switch (d->aq_state) {
             case 0:
-                tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, TFT_BLUE);
-                tft_draw_string("* NORMAL *", (screen_w - 10 * UI_CHAR_W) / 2 + 2, status_y + 5,
-                               TFT_WHITE, TFT_BLUE, 2);
+                aq_text = "*  GOOD   *";
+                aq_bg = TFT_GREEN;
                 break;
             case 1:
-                tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, TFT_ORANGE);
-                tft_draw_string("* WARNING *", (screen_w - 11 * UI_CHAR_W) / 2 + 2, status_y + 5,
-                               TFT_WHITE, TFT_ORANGE, 2);
+                aq_text = "* MODERATE *";
+                aq_bg = TFT_YELLOW;
                 break;
             case 2:
-                tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, TFT_RED);
-                tft_draw_string("* DANGER !", (screen_w - 11 * UI_CHAR_W) / 2 + 2, status_y + 5,
-                               TFT_WHITE, TFT_RED, 2);
+                aq_text = "* UNHEALTHY *";
+                aq_bg = TFT_ORANGE;
+                break;
+            case 3:
+                aq_text = "* VERY UNHEALTHY *";
+                aq_bg = TFT_RED;
+                break;
+            case 4:
+                aq_text = "* HAZARDOUS *";
+                aq_bg = TFT_MAGENTA;
                 break;
             default:
+                aq_text = "* UNKNOWN *";
+                aq_bg = TFT_DARKGRAY;
                 break;
         }
-        s_last_alert_state = d->global_level;
+        tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, aq_bg);
+        int text_w = strlen(aq_text) * UI_CHAR_W;
+        tft_draw_string(aq_text, (screen_w - text_w) / 2, status_y + 5,
+                       TFT_WHITE, aq_bg, 2);
+        s_last_alert_state = (int)d->aq_state;
     }
 }

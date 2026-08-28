@@ -32,6 +32,7 @@ extern "C" {
 #define SENSOR_SEN54  0
 #define SENSOR_SEN66  1
 #define SENSOR_SEN68  2
+#define SENSOR_UART   3
 
 /* ============================================ */
 /* RUNTIME SENSOR DETECTION GLOBALS            */
@@ -43,12 +44,16 @@ extern int g_has_pm1_support;          /* PM1.0 ultrafine particles */
 extern int g_has_nox_support;          /* NOx index (SEN66/SEN68 only) */
 extern int g_has_hcho_support;         /* HCHO formaldehyde in ppb (SEN68 only) */
 extern int g_has_co2_support;          /* CO2 ppm (SEN66 only) */
+extern int g_has_pm10_support;         /* PM10 (UART sensor) */
+extern int g_has_pressure_support;     /* Atmospheric pressure hPa (UART sensor) */
+extern int g_has_aq_support;           /* Air quality state 0-4 (UART sensor) */
 
 /* ============================================ */
 /* SENSOR DETECTION FUNCTION                   */
 /* Call once during initialization             */
 /* ============================================ */
 int detect_sensor_type(void);
+int detect_uart_sensor(void);
 
 /* ============================================ */
 /* UNIFIED API FUNCTIONS                       */
