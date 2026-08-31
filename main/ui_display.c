@@ -43,7 +43,26 @@ void ui_draw_header(const char *sensor_name)
 
     tft_draw_string("ESP32 ", 5, 3, TFT_CYAN, TFT_BG_COLOR, 2);
 
-    {
+    const char *vs = strstr(sensor_name, " vs ");
+    if (vs) {
+        char left_name[16], right_name[16];
+        int left_len = vs - sensor_name;
+        strncpy(left_name, sensor_name, left_len);
+        left_name[left_len] = '\0';
+        strcpy(right_name, vs + 4);
+
+        int right_w = strlen(right_name) * UI_CHAR_W;
+        int x_right = screen_w - right_w - 5;
+        tft_draw_string(right_name, x_right, 3, TFT_CYAN, TFT_BG_COLOR, 2);
+
+        int vs_w = 2 * UI_CHAR_W;
+        int x_vs = x_right - vs_w - 4;
+        tft_draw_string("vs", x_vs, 3, TFT_YELLOW, TFT_BG_COLOR, 2);
+
+        int left_w = strlen(left_name) * UI_CHAR_W;
+        int x_left = x_vs - left_w - 4;
+        tft_draw_string(left_name, x_left, 3, TFT_GREEN, TFT_BG_COLOR, 2);
+    } else {
         int name_len = strlen(sensor_name);
         int x_sensor = screen_w - (name_len * UI_CHAR_W) - 5;
         tft_draw_string(sensor_name, x_sensor, 3, TFT_GREEN, TFT_BG_COLOR, 2);
@@ -234,8 +253,11 @@ static void ui_draw_uart_sensor_screen(const ui_sensor_data_t *d)
 void ui_draw_sensor_screen(const ui_sensor_data_t *d)
 {
     if (g_sensor_type == SENSOR_UART) {
-    ui_draw_uart_sensor_screen(d);
-    return;
+        ui_draw_uart_sensor_screen(d);
+        return;
+    }
+    if (g_sensor_type == SENSOR_DUAL) {
+        return;
     }
 
     char buf[64];
@@ -507,5 +529,128 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
         tft_draw_string(aq_text, (screen_w - text_w) / 2, status_y + 5,
                        TFT_WHITE, aq_bg, 2);
         s_last_alert_state = (int)d->aq_state;
+    }
+}
+
+/* ============================================ */
+/* DUAL SENSOR COMPARE TABLE (no units)         */
+/* ============================================ */
+void ui_draw_compare_table(const ui_dual_data_t *d)
+{
+    char buf[64];
+    int screen_w = tft_get_width();
+    int screen_h = tft_get_height();
+
+    int col1_x = 6;
+    int col2_x = 75;
+    int col3_x = 155;
+    int row_gap = 28;
+    int status_y = screen_h - UI_STATUS_BAR_HEIGHT;
+
+    int y_hdr = UI_HEADER_HEIGHT + 10;
+    int y_temp  = y_hdr + 26;
+    int y_humid = y_temp + row_gap;
+    int y_pm1   = y_humid + row_gap;
+    int y_pm25  = y_pm1 + row_gap;
+    int y_pm10  = y_pm25 + row_gap;
+    int y_co2   = y_pm10 + row_gap;
+    int y_voc   = y_co2 + row_gap;
+
+    if (s_first_draw) {
+        tft_fill_rect(0, UI_HEADER_HEIGHT, screen_w,
+                      screen_h - UI_HEADER_HEIGHT - UI_STATUS_BAR_HEIGHT, TFT_BG_COLOR);
+
+        /* Table header */
+        tft_draw_string("UART", col2_x + 12, y_hdr, TFT_CYAN, TFT_BG_COLOR, 2);
+        tft_draw_string("SEN66", col3_x + 6, y_hdr, TFT_CYAN, TFT_BG_COLOR, 2);
+        tft_fill_rect(4, y_hdr + 18, screen_w - 8, 1, TFT_DARKGRAY);
+
+        /* Row labels */
+        tft_draw_string("Temp", col1_x, y_temp, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("Hum", col1_x, y_humid, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("PM1.0", col1_x, y_pm1, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("PM2.5", col1_x, y_pm25, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("PM10", col1_x, y_pm10, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("CO2", col1_x, y_co2, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("VOC", col1_x, y_voc, TFT_WHITE, TFT_BG_COLOR, 2);
+
+        s_first_draw = false;
+    }
+
+    /* === UPDATE MODE === */
+
+    /* Temp */
+    tft_fill_rect(col2_x, y_temp, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->uart_temp);
+    tft_draw_string(buf, col2_x, y_temp, d->color_temp, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_temp, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->i2c_temp);
+    tft_draw_string(buf, col3_x, y_temp, d->color_temp, TFT_BG_COLOR, 2);
+
+    /* Humidity */
+    tft_fill_rect(col2_x, y_humid, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->uart_humidity);
+    tft_draw_string(buf, col2_x, y_humid, d->color_humid, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_humid, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->i2c_humidity);
+    tft_draw_string(buf, col3_x, y_humid, d->color_humid, TFT_BG_COLOR, 2);
+
+    /* PM1.0 */
+    tft_fill_rect(col2_x, y_pm1, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->uart_pm1);
+    tft_draw_string(buf, col2_x, y_pm1, d->color_pm1, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_pm1, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->i2c_pm1);
+    tft_draw_string(buf, col3_x, y_pm1, d->color_pm1, TFT_BG_COLOR, 2);
+
+    /* PM2.5 */
+    tft_fill_rect(col2_x, y_pm25, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->uart_pm25);
+    tft_draw_string(buf, col2_x, y_pm25, d->color_pm25, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_pm25, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->i2c_pm25);
+    tft_draw_string(buf, col3_x, y_pm25, d->color_pm25, TFT_BG_COLOR, 2);
+
+    /* PM10 */
+    tft_fill_rect(col2_x, y_pm10, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->uart_pm10);
+    tft_draw_string(buf, col2_x, y_pm10, d->color_pm10, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_pm10, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->i2c_pm10);
+    tft_draw_string(buf, col3_x, y_pm10, d->color_pm10, TFT_BG_COLOR, 2);
+
+    /* CO2 */
+    tft_fill_rect(col2_x, y_co2, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5u", d->uart_co2);
+    tft_draw_string(buf, col2_x, y_co2, d->color_co2, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_co2, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5u", d->i2c_co2);
+    tft_draw_string(buf, col3_x, y_co2, d->color_co2, TFT_BG_COLOR, 2);
+
+    /* VOC */
+    tft_fill_rect(col2_x, y_voc, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.0f", d->uart_voc);
+    tft_draw_string(buf, col2_x, y_voc, d->color_voc, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_voc, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.0f", d->i2c_voc);
+    tft_draw_string(buf, col3_x, y_voc, d->color_voc, TFT_BG_COLOR, 2);
+
+    /* Status Bar - AQ state */
+    if (s_last_alert_state != (int)d->uart_aq) {
+        const char *aq_text;
+        uint16_t aq_bg;
+        switch (d->uart_aq) {
+            case 0: aq_text = "*  GOOD   *"; aq_bg = TFT_GREEN; break;
+            case 1: aq_text = "* MODERATE *"; aq_bg = TFT_YELLOW; break;
+            case 2: aq_text = "* UNHEALTHY *"; aq_bg = TFT_ORANGE; break;
+            case 3: aq_text = "* VERY UNHEALTHY *"; aq_bg = TFT_RED; break;
+            case 4: aq_text = "* HAZARDOUS *"; aq_bg = TFT_MAGENTA; break;
+            default: aq_text = "* UNKNOWN *"; aq_bg = TFT_DARKGRAY; break;
+        }
+        tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, aq_bg);
+        int text_w = strlen(aq_text) * UI_CHAR_W;
+        tft_draw_string(aq_text, (screen_w - text_w) / 2, status_y + 5,
+                       TFT_WHITE, aq_bg, 2);
+        s_last_alert_state = (int)d->uart_aq;
     }
 }

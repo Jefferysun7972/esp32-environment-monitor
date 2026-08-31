@@ -36,9 +36,7 @@
 #include "ui_display.h"
 
 #include "sensirion_common.h"
-#if SENSOR_USE_UART
 #include "uart_sensor.h"
-#endif
 #include "sensirion_i2c_hal.h"
 
 #if USE_TFT_LCD
@@ -58,9 +56,7 @@ static const char *TAG = "env_monitor";
 
 static uint8_t s_led_state = 0;
 static bool s_alert_active = false;              /* Track if alert mode is active */
-#if SENSOR_USE_UART
 static uart_sensor_data_t s_uart_data;
-#endif
 static int s_alert_blink_counter = 0;            /* Counter for alert flashing pattern */
 
 #ifdef CONFIG_BLINK_LED_STRIP
@@ -126,14 +122,13 @@ static void configure_led(void)
  * Uses unified macros from sensor_config.h that automatically call
  * the correct API functions based on CONFIG_SENSOR_TYPE selection.
  */
-#if !SENSOR_USE_UART
 static void init_environmental_sensor(void)
 {
     int16_t error = NO_ERROR;
 
     /* ===== RUNTIME SENSOR DETECTION ===== */
     /* Automatically identify SEN66 vs SEN68 at startup */
-    if (detect_sensor_type() != 0) {
+    if (g_display_mode != 2) {
         ESP_LOGW(TAG, "⚠️ Sensor detection failed, using default (SEN66) mode");
     }   
 
@@ -162,9 +157,6 @@ static void init_environmental_sensor(void)
 
     ESP_LOGI(TAG, "🎉 %s sensor initialized successfully! Ready to read data.", g_sensor_name);
 }
-#endif
-
-#if SENSOR_USE_UART
 
 static bool read_and_display_uart_sensor_data(void)
 {
@@ -236,8 +228,6 @@ static bool read_and_display_uart_sensor_data(void)
     return is_alert;
 }
 
-#endif /* SENSOR_USE_UART */
-
 /**
  * @brief Read and display sensor data with three-color level system
  * 
@@ -246,7 +236,6 @@ static bool read_and_display_uart_sensor_data(void)
  * 
  * @return Returns true if alert conditions are met, false otherwise
  */
-#if !SENSOR_USE_UART
 static bool read_and_display_sensor_data(void)
 {
     uint16_t pm1p0 = 0, pm2p5 = 0, pm4p0 = 0, pm10p0 = 0;
@@ -343,7 +332,77 @@ static bool read_and_display_sensor_data(void)
 
     return is_alert;
 }
+
+static bool read_and_display_dual_sensor_data(void)
+{
+    /* Read UART */
+    bool uart_ok = uart_sensor_read(&s_uart_data);
+
+    /* Read I2C */
+    uint16_t pm1p0 = 0, pm2p5 = 0, pm4p0 = 0, pm10p0 = 0;
+    int16_t humidity = 0, temperature = 0, voc_index = 0, nox_index = 0;
+    uint16_t co2 = 0;
+
+    int16_t error = sensor_read_measured_values(
+        &pm1p0, &pm2p5, &pm4p0, &pm10p0,
+        &humidity, &temperature,
+        &voc_index, &nox_index,
+        &co2
+    );
+
+    if (!uart_ok && error != NO_ERROR) {
+        return false;
+    }
+
+    float uart_temp = (float)s_uart_data.temperature;
+    float uart_hum = (float)s_uart_data.humidity;
+    float uart_pm1 = (float)s_uart_data.pms_in_pm1_0;
+    float uart_pm25 = (float)s_uart_data.pms_in_pm2_5;
+    float uart_pm10 = (float)s_uart_data.pms_in_pm10;
+    uint16_t uart_co2 = s_uart_data.co2_count;
+    float uart_voc = (float)s_uart_data.tvoc_count;
+    uint16_t uart_aq = s_uart_data.aq_state;
+
+    float i2c_temp = (float)temperature / 200.0f;
+    float i2c_hum = (float)humidity / 100.0f;
+    float i2c_pm1 = (float)pm1p0 / 10.0f;
+    float i2c_pm25 = (float)pm2p5 / 10.0f;
+    float i2c_pm10 = (float)pm10p0 / 10.0f;
+    float i2c_voc = (float)voc_index / 10.0f;
+
+    bool is_alert = alert_check_environmental(uart_pm25, uart_co2);
+
+    ESP_LOGI(TAG, "[DUAL] UART: T=%.1f H=%.1f PM1=%.1f PM2.5=%.1f PM10=%.1f CO2=%u VOC=%.0f AQ=%u",
+             uart_temp, uart_hum, uart_pm1, uart_pm25, uart_pm10, uart_co2, uart_voc, uart_aq);
+    ESP_LOGI(TAG, "[DUAL] I2C:  T=%.1f H=%.1f PM1=%.1f PM2.5=%.1f PM10=%.1f CO2=%u VOC=%.0f",
+             i2c_temp, i2c_hum, i2c_pm1, i2c_pm25, i2c_pm10, co2, i2c_voc);
+
+#if USE_TFT_LCD
+    {
+        ui_dual_data_t d = {
+            .uart_temp = uart_temp,   .uart_humidity = uart_hum,
+            .uart_pm1 = uart_pm1,     .uart_pm25 = uart_pm25,
+            .uart_pm10 = uart_pm10,   .uart_co2 = uart_co2,
+            .uart_voc = uart_voc,     .uart_aq = uart_aq,
+            .i2c_temp = i2c_temp,     .i2c_humidity = i2c_hum,
+            .i2c_pm1 = i2c_pm1,       .i2c_pm25 = i2c_pm25,
+            .i2c_pm10 = i2c_pm10,     .i2c_co2 = co2,
+            .i2c_voc = i2c_voc,
+            .color_temp = alert_get_color(uart_temp, TEMP_NORMAL_MIN, TEMP_NORMAL_MAX, TEMP_DANGER_MAX, true),
+            .color_humid = alert_get_color(uart_hum, HUMID_NORMAL_MIN, HUMID_NORMAL_MAX, HUMID_DANGER_MAX, true),
+            .color_pm1 = alert_get_color(uart_pm1, 0, PM1_NORMAL_MAX, PM1_WARNING_MAX, false),
+            .color_pm25 = alert_get_color(uart_pm25, 0, PM25_NORMAL_MAX, PM25_WARNING_MAX, false),
+            .color_pm10 = alert_get_color(uart_pm10, 0, PM10_NORMAL_MAX, PM10_WARNING_MAX, false),
+            .color_co2 = alert_get_color((float)uart_co2, 0, CO2_NORMAL_MAX, CO2_WARNING_MAX, false),
+            .color_voc = alert_get_color(uart_voc, 0, VOC_NORMAL_MAX, VOC_WARNING_MAX, false),
+            .color_aq = alert_get_color((float)uart_aq, 0, AQ_NORMAL_MAX, AQ_WARNING_MAX, false),
+        };
+        ui_draw_compare_table(&d);
+    }
 #endif
+
+    return is_alert;
+}
 
 void app_main(void)
 {
@@ -356,63 +415,52 @@ void app_main(void)
     }
 #endif
 
-#if SENSOR_USE_UART
-    /* ===== UART SENSOR PATH ===== */
-    detect_uart_sensor();
-
-#if USE_TFT_LCD
-    ui_draw_header(g_sensor_name);
-#endif
-
-    if (!uart_sensor_init()) {
-        ESP_LOGE(TAG, "Failed to initialize UART sensor");
-        return;
-    }
-    ESP_LOGI(TAG, "UART sensor initialized successfully");
-
-    ESP_LOGI(TAG, "Starting main loop - reading UART sensor every %d ms...",
-             SENSOR_READ_PERIOD_MS);
-
-    while (1) {
-        bool alert_active = read_and_display_uart_sensor_data();
-
-        if (alert_active) {
-            s_alert_blink_counter++;
-            gpio_set_level(BLINK_GPIO, !gpio_get_level(BLINK_GPIO));
-            vTaskDelay(pdMS_TO_TICKS(BLINK_INTERVAL_ALERT));
-        } else {
-            s_led_state = !s_led_state;
-            blink_led();
-            vTaskDelay(pdMS_TO_TICKS(BLINK_INTERVAL_NORMAL));
-        }
-    }
-
-#else
-    /* ===== I2C SENSOR PATH ===== */
-
-#if USE_TFT_LCD
-    ui_draw_header(g_sensor_name);
-#endif
-
-    ESP_LOGI(TAG, "Setting up I2C for %s sensor...", g_sensor_name);
+    /* ===== ALWAYS INIT I2C ===== */
+    ESP_LOGI(TAG, "Setting up I2C bus...");
     esp_err_t err = i2c_manager_init();
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize I2C bus! Error: 0x%x", err);
+    } else {
+        ESP_LOGI(TAG, "I2C bus initialized");
+        sensirion_i2c_hal_init();
+    }
+
+    /* ===== ALWAYS INIT UART ===== */
+    uart_sensor_init();
+
+    /* ===== DETECT CONNECTED SENSORS ===== */
+    if (detect_all_sensors() != 0) {
+        ESP_LOGE(TAG, "No sensors detected! Halting.");
         return;
     }
-    ESP_LOGI(TAG, "I2C bus initialized successfully");
 
-    /* Initialize I2C HAL layer */
-    sensirion_i2c_hal_init();
-    
-    /* Initialize the selected sensor */
-    init_environmental_sensor();
+#if USE_TFT_LCD
+    ui_draw_header(g_sensor_name);
+#endif
 
-    ESP_LOGI(TAG, "Starting main loop - reading %s every %d ms...", 
-             g_sensor_name, SENSOR_READ_PERIOD_MS);
+    /* ===== INIT SENSOR(S) BASED ON MODE ===== */
+    if (g_display_mode == 0 || g_display_mode == 2) {
+        /* I2C sensor init (needed for both I2C-only and DUAL modes) */
+        init_environmental_sensor();
+    }
+
+    ESP_LOGI(TAG, "Starting main loop (mode=%d, period=%d ms)...",
+             g_display_mode, SENSOR_READ_PERIOD_MS);
 
     while (1) {
-        bool alert_active = read_and_display_sensor_data();
+        bool alert_active = false;
+
+        switch (g_display_mode) {
+            case 0: /* I2C only */
+                alert_active = read_and_display_sensor_data();
+                break;
+            case 1: /* UART only */
+                alert_active = read_and_display_uart_sensor_data();
+                break;
+            case 2: /* DUAL compare */
+                alert_active = read_and_display_dual_sensor_data();
+                break;
+        }
 
         if (alert_active) {
             s_alert_blink_counter++;
@@ -424,5 +472,4 @@ void app_main(void)
             vTaskDelay(pdMS_TO_TICKS(BLINK_INTERVAL_NORMAL));
         }
     }
-#endif /* SENSOR_USE_UART */
 }

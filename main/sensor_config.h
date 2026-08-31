@@ -33,7 +33,7 @@ extern "C" {
 #define SENSOR_SEN66  1
 #define SENSOR_SEN68  2
 #define SENSOR_UART   3
-
+#define SENSOR_DUAL   4
 /* ============================================ */
 /* RUNTIME SENSOR DETECTION GLOBALS            */
 /* Set by detect_sensor_type() at runtime      */
@@ -47,14 +47,16 @@ extern int g_has_co2_support;          /* CO2 ppm (SEN66 only) */
 extern int g_has_pm10_support;         /* PM10 (UART sensor) */
 extern int g_has_pressure_support;     /* Atmospheric pressure hPa (UART sensor) */
 extern int g_has_aq_support;           /* Air quality state 0-4 (UART sensor) */
-
+extern int g_has_i2c_sensor;           /* I2C sensor detected at boot */
+extern int g_has_uart_sensor;          /* UART sensor detected at boot */
+extern int g_display_mode;             /* 0=I2C, 1=UART, 2=DUAL compare */
 /* ============================================ */
 /* SENSOR DETECTION FUNCTION                   */
 /* Call once during initialization             */
 /* ============================================ */
 int detect_sensor_type(void);
 int detect_uart_sensor(void);
-
+int detect_all_sensors(void);
 /* ============================================ */
 /* UNIFIED API FUNCTIONS                       */
 /* Automatically route to correct sensor       */
