@@ -13,7 +13,7 @@
 /* Set to 1 to use UART multi-sensor module     */
 /* instead of I2C SEN54/SEN66/SEN68             */
 /* ============================================ */
-#define SENSOR_USE_UART             1
+// #define SENSOR_USE_UART             1
 
 /* ============================================ */
 /* I2C CONFIGURATION                           */
