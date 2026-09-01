@@ -1,0 +1,9 @@
+idf_component_register(
+    SRCS
+        "sen5x_i2c.c"
+    INCLUDE_DIRS
+        "."
+    REQUIRES 
+        driver
+        i2c_manager
+)
