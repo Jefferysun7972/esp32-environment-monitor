@@ -16,6 +16,7 @@
 
 #include <string.h>
 #include "esp_log.h"
+#include "driver/i2c_master.h"
 
 /* Include ALL sensor headers for runtime switching */
 #include "sen5x_i2c.h"
@@ -29,17 +30,22 @@ extern "C" {
 /* ============================================ */
 /* SENSOR TYPE ENUMERATION                     */
 /* ============================================ */
-#define SENSOR_SEN54  0
-#define SENSOR_SEN66  1
-#define SENSOR_SEN68  2
-#define SENSOR_UART   3
+#define SENSOR_SEN54       0
+#define SENSOR_SEN66       1
+#define SENSOR_SEN68       2
+#define SENSOR_UART        3
+#define SENSOR_DUAL_I2C    4
+#define SENSOR_AM2020DY    5
+
+#define DISPLAY_MODE_SINGLE  0
+#define DISPLAY_MODE_DUAL    1
 
 /* ============================================ */
 /* RUNTIME SENSOR DETECTION GLOBALS            */
 /* Set by detect_sensor_type() at runtime      */
 /* ============================================ */
-extern int g_sensor_type;              /* SENSOR_SEN54 / SENSOR_SEN66 / SENSOR_SEN68 */
-extern const char* g_sensor_name;       /* "SEN54" / "SEN66" / "SEN68" */
+extern int g_sensor_type;              /* SENSOR_SEN54 / SENSOR_SEN66 / SENSOR_SEN68 / SENSOR_DUAL_I2C */
+extern const char* g_sensor_name;       /* "SEN54" / "SEN66" / "SEN68" / "AM2020DY vs SEN66" */
 extern int g_has_pm1_support;          /* PM1.0 ultrafine particles */
 extern int g_has_nox_support;          /* NOx index (SEN66/SEN68 only) */
 extern int g_has_hcho_support;         /* HCHO formaldehyde in ppb (SEN68 only) */
@@ -47,6 +53,8 @@ extern int g_has_co2_support;          /* CO2 ppm (SEN66 only) */
 extern int g_has_pm10_support;         /* PM10 (UART sensor) */
 extern int g_has_pressure_support;     /* Atmospheric pressure hPa (UART sensor) */
 extern int g_has_aq_support;           /* Air quality state 0-4 (UART sensor) */
+extern int g_has_am2020dy;             /* AM2020DY I2C sensor detected */
+extern int g_display_mode;             /* DISPLAY_MODE_SINGLE / DISPLAY_MODE_DUAL */
 
 /* ============================================ */
 /* SENSOR DETECTION FUNCTION                   */
@@ -54,6 +62,8 @@ extern int g_has_aq_support;           /* Air quality state 0-4 (UART sensor) */
 /* ============================================ */
 int detect_sensor_type(void);
 int detect_uart_sensor(void);
+int detect_all_sensors(void);
+int detect_am2020dy(i2c_master_dev_handle_t *out_handle);
 
 /* ============================================ */
 /* UNIFIED API FUNCTIONS                       */

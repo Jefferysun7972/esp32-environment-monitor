@@ -8,6 +8,9 @@
 #include "sensor_config.h"
 #include <string.h>
 #include "esp_log.h"
+#include "driver/i2c_master.h"
+#include "i2c_manager.h"
+#include "am2020dy.h"
 
 static const char* TAG = "sensor_detect";
 
@@ -23,11 +26,80 @@ int g_has_co2_support = 1;              /* Default: has CO2 (SEN66) */
 int g_has_pm10_support = 0;             /* Default: no PM10 */
 int g_has_pressure_support = 0;         /* Default: no pressure */
 int g_has_aq_support = 0;               /* Default: no AQ state */
+int g_has_am2020dy = 0;                 /* Default: no AM2020DY */
+int g_display_mode = DISPLAY_MODE_SINGLE; /* Default: single sensor */
 
 /* ============================================ */
 /* SENSOR DETECTION FUNCTION                    */
 /* Call once during system initialization       */
 /* ============================================ */
+int detect_am2020dy(i2c_master_dev_handle_t *out_handle) {
+    ESP_LOGI(TAG, "🔍 Detecting AM2020DY via command probe (addr: 0x%02X)...", AM2020DY_SLAVE_ADDR);
+
+    esp_err_t err = am2020dy_init(out_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "❌ AM2020DY init failed: %s", esp_err_to_name(err));
+        return -1;
+    }
+
+    err = am2020dy_read_product_name(*out_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "❌ AM2020DY not responding");
+        i2c_master_bus_rm_device(*out_handle);
+        *out_handle = NULL;
+        /* Reset bus to recover from failed transaction state */
+        i2c_master_bus_reset(i2c_manager_get_bus_handle());
+        return -1;
+    }
+
+    g_sensor_type = SENSOR_AM2020DY;
+    g_sensor_name = "AM2020DY";
+    g_has_pm1_support = 1;
+    g_has_pm10_support = 1;
+    g_has_nox_support = 0;
+    g_has_hcho_support = 1;
+    g_has_co2_support = 0;
+    g_has_am2020dy = 1;
+    g_display_mode = DISPLAY_MODE_SINGLE;
+
+    ESP_LOGI(TAG, "✅ AM2020DY detected successfully!");
+    return 0;
+}
+
+int detect_all_sensors(void) {
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "Auto-detecting sensors at boot...");
+
+    /* 1. Detect SEN66 (always at 0x6B) */
+    /*    AM2020DY detection is done by caller via am2020dy_init() before this function
+     *    to avoid i2c_master_probe() disrupting the SEN66 device handle state */
+    /* 2. Detect SEN66 (always at 0x6B) */
+    ESP_LOGI(TAG, "Probing I2C sensor (SEN66)...");
+    int i2c_ok = detect_sensor_type();
+
+    /* 3. Determine display mode */
+    if (g_has_am2020dy && i2c_ok == 0) {
+        g_display_mode = DISPLAY_MODE_DUAL;
+        g_sensor_type = SENSOR_DUAL_I2C;
+        g_sensor_name = "AM2020DY vs SEN66";
+        g_has_pm1_support = 1;
+        g_has_pm10_support = 1;
+        g_has_nox_support = 1;
+        g_has_co2_support = 1;
+        g_has_hcho_support = 1;
+        ESP_LOGI(TAG, "  Dual I2C sensor mode: AM2020DY + SEN66");
+    } else if (i2c_ok == 0) {
+        g_display_mode = DISPLAY_MODE_SINGLE;
+        ESP_LOGI(TAG, "  Single I2C sensor mode: %s", g_sensor_name);
+    } else {
+        ESP_LOGE(TAG, "  No I2C sensor detected!");
+        return -1;
+    }
+
+    ESP_LOGI(TAG, "========================================");
+    return 0;
+}
+
 int detect_uart_sensor(void) {
     ESP_LOGI(TAG, "Sensor configured as: **UART Multi-Sensor Module**");
 
@@ -56,7 +128,7 @@ int detect_uart_sensor(void) {
     return 0;
 }
 
-int detect_sensor_type(void) {
+int  detect_sensor_type(void) {
     int8_t product_name[32] = {0};
     int16_t error = 0;
     

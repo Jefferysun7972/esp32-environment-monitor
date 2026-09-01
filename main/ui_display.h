@@ -16,6 +16,37 @@ extern "C" {
 #endif
 
 /* ============================================ */
+/* DUAL I2C SENSOR DATA STRUCTURE               */
+/* ============================================ */
+typedef struct {
+    float a_temp;
+    float a_humidity;
+    float a_pm1;
+    float a_pm25;
+    float a_pm10;
+    uint16_t a_tvoc;
+    uint16_t a_no2;
+    uint16_t a_hcho;
+
+    float s_temp;
+    float s_humidity;
+    float s_pm1;
+    float s_pm25;
+    float s_pm10;
+    float s_nox;
+    float s_voc;
+    uint16_t s_co2;
+
+    uint16_t color_temp;
+    uint16_t color_humid;
+    uint16_t color_pm1;
+    uint16_t color_pm25;
+    uint16_t color_pm10;
+    uint16_t color_co2;
+    uint16_t color_voc;
+} ui_dual_i2c_data_t;
+
+/* ============================================ */
 /* SENSOR DATA STRUCTURE FOR UI RENDERING       */
 /* ============================================ */
 typedef struct {
@@ -64,6 +95,16 @@ void ui_draw_header(const char *sensor_name);
  * @param data  Pointer to sensor data structure with values and colors
  */
 void ui_draw_sensor_screen(const ui_sensor_data_t *data);
+
+/**
+ * @brief Draw dual I2C sensor comparison table
+ *
+ * Common parameters: Temp, Humidity, PM1.0, PM2.5, PM10
+ * Unique parameters shown below the table
+ *
+ * @param data  Pointer to dual sensor data structure
+ */
+void ui_draw_compare_table(const ui_dual_i2c_data_t *data);
 
 #ifdef __cplusplus
 }

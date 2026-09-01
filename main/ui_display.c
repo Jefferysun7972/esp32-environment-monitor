@@ -294,6 +294,8 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
 
     int status_y = screen_h - UI_STATUS_BAR_HEIGHT;
 
+    int val_x_basic = UI_LEFT_MARGIN + VAL_X_BASIC;
+
     /* ===== FIRST DRAW: Complete layout initialization ===== */
     if (s_first_draw) {
         tft_fill_rect(0, UI_HEADER_HEIGHT, screen_w,
@@ -325,6 +327,9 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
         if (g_has_hcho_support) {
             tft_draw_string("HCHO:", UI_LEFT_MARGIN, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
             tft_draw_string("ppb", screen_w - 3 * UI_CHAR_W - UI_RIGHT_MARGIN, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
+            tft_fill_rect(val_x_basic, y_hcho, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+            snprintf(buf, sizeof(buf), "%6.1f", (float)d->hcho_ppb);
+            tft_draw_string(buf, val_x_basic, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
         } else if (g_has_co2_support) {
             tft_draw_string("CO2:", UI_LEFT_MARGIN, y_co2, d->color_co2, TFT_BG_COLOR, 2);
             tft_draw_string("ppm", screen_w - 3 * UI_CHAR_W - UI_RIGHT_MARGIN, y_co2, d->color_co2, TFT_BG_COLOR, 2);
@@ -349,8 +354,6 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
     }
 
     /* ===== UPDATE MODE: Dynamic three-color refresh ===== */
-
-    int val_x_basic = UI_LEFT_MARGIN + VAL_X_BASIC;
 
     /* Temperature */
     tft_draw_string("Temp:", UI_LEFT_MARGIN, y_temp, d->color_temp, TFT_BG_COLOR, 2);
@@ -395,6 +398,12 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
 
     /* HCHO or CO2 Progress Bar */
     if (g_has_hcho_support) {
+        tft_draw_string("HCHO:", UI_LEFT_MARGIN, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
+        tft_fill_rect(val_x_basic, y_hcho, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+        snprintf(buf, sizeof(buf), "%6.1f", (float)d->hcho_ppb);
+        tft_draw_string(buf, val_x_basic, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
+        tft_draw_string("ppb", screen_w - 3 * UI_CHAR_W - UI_RIGHT_MARGIN, y_hcho, d->color_hcho, TFT_BG_COLOR, 2);
+
         int hcho_pct = (int)(((float)d->hcho_ppb / hcho_max) * 100);
         if (hcho_pct > 100) hcho_pct = 100;
         int hcho_fill_w = (pb_w * hcho_pct) / 100;
@@ -508,4 +517,144 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *d)
                        TFT_WHITE, aq_bg, 2);
         s_last_alert_state = (int)d->aq_state;
     }
+}
+
+/* ============================================ */
+/* DUAL I2C SENSOR COMPARISON TABLE             */
+/* ============================================ */
+void ui_draw_compare_table(const ui_dual_i2c_data_t *d)
+{
+    char buf[64];
+    int screen_w = tft_get_width();
+    int screen_h = tft_get_height();
+
+    int col1_x = 6;
+    int col2_x = 75;
+    int col3_x = 155;
+    int row_gap = 28;
+
+    int y_hdr  = UI_HEADER_HEIGHT + 10;
+    int y_temp = y_hdr + 26;
+    int y_hum  = y_temp + row_gap;
+    int y_pm1  = y_hum + row_gap;
+    int y_pm25 = y_pm1 + row_gap;
+    int y_pm10 = y_pm25 + row_gap;
+    int y_sep  = y_pm10 + row_gap;
+
+    int y_a1   = y_sep + 8;
+    int y_a2   = y_a1 + row_gap;
+    int y_a3   = y_a2 + row_gap;
+
+    int y_s1   = y_sep + 8;
+    int y_s2   = y_s1 + row_gap;
+    int y_s3   = y_s2 + row_gap;
+
+    int y_sep2 = y_s3 + row_gap;
+
+    // int status_y = screen_h - UI_STATUS_BAR_HEIGHT;
+
+    if (s_first_draw) {
+        tft_fill_rect(0, UI_HEADER_HEIGHT, screen_w,
+                      screen_h - UI_HEADER_HEIGHT - UI_STATUS_BAR_HEIGHT, TFT_BG_COLOR);
+
+        tft_draw_string("AM2020DY", col2_x + 12, y_hdr, TFT_CYAN, TFT_BG_COLOR, 2);
+        tft_draw_string("SEN66", col3_x + 6, y_hdr, TFT_CYAN, TFT_BG_COLOR, 2);
+        tft_fill_rect(2, y_hdr + 18, screen_w - 4, 2, TFT_YELLOW);
+
+        tft_draw_string("Temp", col1_x, y_temp, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("Hum", col1_x, y_hum, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("PM1.0", col1_x, y_pm1, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("PM2.5", col1_x, y_pm25, TFT_WHITE, TFT_BG_COLOR, 2);
+        tft_draw_string("PM10", col1_x, y_pm10, TFT_WHITE, TFT_BG_COLOR, 2);
+
+        tft_fill_rect(2, y_sep, screen_w - 4, 2, TFT_DARKGRAY);
+
+        tft_draw_string("AM2020DY:", col1_x, y_a1, TFT_CYAN, TFT_BG_COLOR, 1);
+        tft_draw_string("AM2020DY:", col1_x, y_a2, TFT_CYAN, TFT_BG_COLOR, 1);
+        tft_draw_string("AM2020DY:", col1_x, y_a3, TFT_CYAN, TFT_BG_COLOR, 1);
+
+        snprintf(buf, sizeof(buf), "TVOC:         ppb");
+        tft_draw_string(buf, col1_x + 60, y_a1, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "NO2:          ppb");
+        tft_draw_string(buf, col1_x + 60, y_a2, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "HCHO:         ppb");
+        tft_draw_string(buf, col1_x + 60, y_a3, TFT_WHITE, TFT_BG_COLOR, 1);
+
+        tft_draw_string("SEN66:", col1_x, y_s1, TFT_GREEN, TFT_BG_COLOR, 1);
+        tft_draw_string("SEN66:", col1_x, y_s2, TFT_GREEN, TFT_BG_COLOR, 1);
+        tft_draw_string("SEN66:", col1_x, y_s3, TFT_GREEN, TFT_BG_COLOR, 1);
+
+        snprintf(buf, sizeof(buf), "CO2:          ppm");
+        tft_draw_string(buf, col1_x + 60, y_s1, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "NOx:          idx");
+        tft_draw_string(buf, col1_x + 60, y_s2, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "VOC:          idx");
+        tft_draw_string(buf, col1_x + 60, y_s3, TFT_WHITE, TFT_BG_COLOR, 1);
+
+        tft_fill_rect(2, y_sep2, screen_w - 4, 2, TFT_YELLOW);
+    }
+
+    /* Comparison table */
+    tft_fill_rect(col2_x, y_temp, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->a_temp);
+    tft_draw_string(buf, col2_x, y_temp, d->color_temp, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_temp, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->s_temp);
+    tft_draw_string(buf, col3_x, y_temp, d->color_temp, TFT_BG_COLOR, 2);
+
+    tft_fill_rect(col2_x, y_hum, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->a_humidity);
+    tft_draw_string(buf, col2_x, y_hum, d->color_humid, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_hum, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->s_humidity);
+    tft_draw_string(buf, col3_x, y_hum, d->color_humid, TFT_BG_COLOR, 2);
+
+    tft_fill_rect(col2_x, y_pm1, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->a_pm1);
+    tft_draw_string(buf, col2_x, y_pm1, d->color_pm1, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_pm1, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->s_pm1);
+    tft_draw_string(buf, col3_x, y_pm1, d->color_pm1, TFT_BG_COLOR, 2);
+
+    tft_fill_rect(col2_x, y_pm25, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->a_pm25);
+    tft_draw_string(buf, col2_x, y_pm25, d->color_pm25, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_pm25, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->s_pm25);
+    tft_draw_string(buf, col3_x, y_pm25, d->color_pm25, TFT_BG_COLOR, 2);
+
+    tft_fill_rect(col2_x, y_pm10, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->a_pm10);
+    tft_draw_string(buf, col2_x, y_pm10, d->color_pm10, TFT_BG_COLOR, 2);
+    tft_fill_rect(col3_x, y_pm10, 6 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "%5.1f", d->s_pm10);
+    tft_draw_string(buf, col3_x, y_pm10, d->color_pm10, TFT_BG_COLOR, 2);
+
+    /* AM2020DY unique */
+    tft_fill_rect(col1_x + 60, y_a1, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "TVOC: %5u ppb", d->a_tvoc);
+    tft_draw_string(buf, col1_x + 60, y_a1, TFT_WHITE, TFT_BG_COLOR, 1);
+
+    tft_fill_rect(col1_x + 60, y_a2, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "NO2:  %5u ppb", d->a_no2);
+    tft_draw_string(buf, col1_x + 60, y_a2, TFT_WHITE, TFT_BG_COLOR, 1);
+
+    tft_fill_rect(col1_x + 60, y_a3, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "HCHO: %5u ppb", d->a_hcho);
+    tft_draw_string(buf, col1_x + 60, y_a3, TFT_WHITE, TFT_BG_COLOR, 1);
+
+    /* SEN66 unique */
+    tft_fill_rect(col1_x + 60, y_s1, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "CO2:  %5u ppm", d->s_co2);
+    tft_draw_string(buf, col1_x + 60, y_s1, d->color_co2, TFT_BG_COLOR, 1);
+
+    tft_fill_rect(col1_x + 60, y_s2, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "NOx:  %5.1f idx", d->s_nox);
+    tft_draw_string(buf, col1_x + 60, y_s2, TFT_WHITE, TFT_BG_COLOR, 1);
+
+    tft_fill_rect(col1_x + 60, y_s3, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "VOC:  %5.1f idx", d->s_voc);
+    tft_draw_string(buf, col1_x + 60, y_s3, d->color_voc, TFT_BG_COLOR, 1);
+
+    s_first_draw = false;
 }

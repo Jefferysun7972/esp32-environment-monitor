@@ -172,6 +172,18 @@ void sensirion_i2c_hal_init(void) {
     
     ESP_LOGI(TAG, "✅ Obtained I2C bus handle from I2C Manager");
 
+    /*
+     * NOTE: Do NOT call i2c_master_bus_reset() here. The bus was just created
+     * by i2c_new_master_bus() in i2c_manager_init(), which already initializes
+     * the hardware controller correctly via i2c_hal_master_init().
+     *
+     * Calling i2c_master_bus_reset() triggers s_i2c_master_clear_bus() which
+     * temporarily hijacks SDA/SCL as manual GPIO outputs. When the GPIO config
+     * is restored, the I2C controller's internal state is not properly
+     * re-synchronized, causing the first i2c_master_transmit() to fail with
+     * ESP_ERR_INVALID_STATE (status never reaches I2C_STATUS_DONE).
+     */
+
     if (dev_handle == NULL) {
         i2c_device_config_t dev_cfg = {
             .dev_addr_length = I2C_ADDR_BIT_LEN_7,

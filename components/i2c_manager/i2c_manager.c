@@ -149,3 +149,75 @@ esp_err_t i2c_manager_deinit(void)
     
     return ESP_OK;
 }
+
+int i2c_manager_scan(void)
+{
+    if (!s_initialized || !s_bus_handle) {
+        ESP_LOGE(TAG, "Cannot scan: I2C manager not initialized");
+        return -1;
+    }
+
+    ESP_LOGI(TAG, "========================================");
+    ESP_LOGI(TAG, "Scanning I2C bus (0x08-0x77)...");
+    ESP_LOGI(TAG, "========================================");
+
+    int found = 0;
+
+    for (uint16_t addr = 0x08; addr <= 0x77; addr++) {
+        esp_err_t err = i2c_master_probe(s_bus_handle, addr, 50);
+
+        if (err == ESP_OK) {
+            found++;
+
+            const char *name = "Unknown";
+            if (addr == 0x6B) {
+                name = "SEN66 / SEN68";
+            } else if (addr == 0x69) {
+                name = "SEN54";
+            } else if (addr == 0x23) {
+                name = "SHT3x / SHT31";
+            } else if (addr == 0x3C || addr == 0x3D) {
+                name = "SSD1306 OLED";
+            } else if (addr == 0x48 || addr == 0x49) {
+                name = "TMP102 / ADS1115";
+            } else if (addr == 0x50) {
+                name = "AT24Cxx EEPROM";
+            } else if (addr == 0x68) {
+                name = "DS1307 RTC / MPU6050";
+            } else if (addr == 0x76 || addr == 0x77) {
+                name = "BMP280 / BME280";
+            }
+
+            ESP_LOGI(TAG, "   Found: 0x%02X (%3d) - %s", addr, addr, name);
+        } else if (err == ESP_ERR_INVALID_STATE) {
+            ESP_LOGE(TAG, "   BUS ERROR at 0x%02X (ESP_ERR_INVALID_STATE)", addr);
+            ESP_LOGE(TAG, "   I2C hardware controller is in bad state!");
+            ESP_LOGE(TAG, "   Aborting scan...");
+            break;
+        }
+    }
+
+    ESP_LOGI(TAG, "========================================");
+    if (found > 0) {
+        ESP_LOGI(TAG, "Scan complete: %d device(s) found", found);
+    } else {
+        ESP_LOGW(TAG, "No I2C devices detected!");
+        ESP_LOGW(TAG, "   Check: wiring, pull-ups, power (3.3V)");
+    }
+    ESP_LOGI(TAG, "========================================");
+
+    /*
+     * NOTE: Do NOT call i2c_master_bus_reset() here!
+     *
+     * i2c_master_bus_reset() calls s_i2c_master_clear_bus() which temporarily
+     * hijacks SDA/SCL as GPIO outputs. When the GPIO matrix is restored, the
+     * I2C hardware controller's internal FSM is not properly re-synchronized,
+     * causing all subsequent i2c_master_transmit() calls to fail with
+     * ESP_ERR_INVALID_STATE.
+     *
+     * i2c_master_probe() is a stateless operation that does not leave the bus
+     * in a bad state, so no reset is needed after scanning.
+     */
+
+    return found;
+}

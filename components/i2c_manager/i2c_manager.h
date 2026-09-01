@@ -40,7 +40,7 @@
 #define I2C_MANAGER_DEFAULT_PORT    I2C_NUM_0
 #define I2C_MANAGER_SDA_PIN         21
 #define I2C_MANAGER_SCL_PIN         22
-#define I2C_MANAGER_FREQ_HZ         400000
+#define I2C_MANAGER_FREQ_HZ         100000
 
 /**
  * @brief Initialize the I2C manager and create master bus
@@ -148,5 +148,18 @@ bool i2c_manager_is_ready(void);
  * @endcode
  */
 esp_err_t i2c_manager_deinit(void);
+
+/**
+ * @brief Scan I2C bus for connected devices
+ *
+ * Probes all 7-bit addresses from 0x08 to 0x77 using i2c_master_probe().
+ * Logs found devices and returns the count.
+ *
+ * @return Number of devices found on the bus, or -1 if bus is not ready
+ *
+ * @note Must be called after i2c_manager_init() and before any device
+ *       handles are added to the bus.
+ */
+int i2c_manager_scan(void);
 
 #endif /* I2C_MANAGER_H */
