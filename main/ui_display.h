@@ -42,8 +42,13 @@ typedef struct {
     uint16_t color_pm1;
     uint16_t color_pm25;
     uint16_t color_pm10;
+    uint16_t color_tvoc;
+    uint16_t color_no2;
+    uint16_t color_hcho;
     uint16_t color_co2;
+    uint16_t color_nox;
     uint16_t color_voc;
+    int global_level;
 } ui_dual_i2c_data_t;
 
 /* ============================================ */

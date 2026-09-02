@@ -45,8 +45,8 @@ void ui_draw_header(const char *sensor_name)
 
     {
         int name_len = strlen(sensor_name);
-        int x_sensor = screen_w - (name_len * UI_CHAR_W) - 5;
-        tft_draw_string(sensor_name, x_sensor, 3, TFT_GREEN, TFT_BG_COLOR, 2);
+        int x_sensor = screen_w - (name_len * 6) - 5;
+        tft_draw_string(sensor_name, x_sensor, 7, TFT_GREEN, TFT_BG_COLOR, 1);
     }
 
     tft_draw_string("@FELLOWES", screen_w - 8 * 6 - 5, 22, TFT_YELLOW, TFT_BG_COLOR, 1);
@@ -531,9 +531,10 @@ void ui_draw_compare_table(const ui_dual_i2c_data_t *d)
     int col1_x = 6;
     int col2_x = 75;
     int col3_x = 155;
-    int row_gap = 28;
+    int row_gap = 22;
+    int row_gap_sm = 17;
 
-    int y_hdr  = UI_HEADER_HEIGHT + 10;
+    int y_hdr  = UI_HEADER_HEIGHT + 4;
     int y_temp = y_hdr + 26;
     int y_hum  = y_temp + row_gap;
     int y_pm1  = y_hum + row_gap;
@@ -541,15 +542,15 @@ void ui_draw_compare_table(const ui_dual_i2c_data_t *d)
     int y_pm10 = y_pm25 + row_gap;
     int y_sep  = y_pm10 + row_gap;
 
-    int y_a1   = y_sep + 8;
-    int y_a2   = y_a1 + row_gap;
-    int y_a3   = y_a2 + row_gap;
+    int y_a1   = y_sep + 6;
+    int y_a2   = y_a1 + row_gap_sm;
+    int y_a3   = y_a2 + row_gap_sm;
 
-    int y_s1   = y_sep + 8;
-    int y_s2   = y_s1 + row_gap;
-    int y_s3   = y_s2 + row_gap;
+    int y_s1   = y_a3 + row_gap_sm;
+    int y_s2   = y_s1 + row_gap_sm;
+    int y_s3   = y_s2 + row_gap_sm;
 
-    int y_sep2 = y_s3 + row_gap;
+    int y_sep2 = y_s3 + row_gap_sm;
 
     // int status_y = screen_h - UI_STATUS_BAR_HEIGHT;
 
@@ -557,8 +558,8 @@ void ui_draw_compare_table(const ui_dual_i2c_data_t *d)
         tft_fill_rect(0, UI_HEADER_HEIGHT, screen_w,
                       screen_h - UI_HEADER_HEIGHT - UI_STATUS_BAR_HEIGHT, TFT_BG_COLOR);
 
-        tft_draw_string("AM2020DY", col2_x + 12, y_hdr, TFT_CYAN, TFT_BG_COLOR, 2);
-        tft_draw_string("SEN66", col3_x + 6, y_hdr, TFT_CYAN, TFT_BG_COLOR, 2);
+        tft_draw_string("AM2020DY", col2_x + 12, y_hdr + 4, TFT_CYAN, TFT_BG_COLOR, 1);
+        tft_draw_string("SEN66", col3_x + 32, y_hdr + 4, TFT_CYAN, TFT_BG_COLOR, 1);
         tft_fill_rect(2, y_hdr + 18, screen_w - 4, 2, TFT_YELLOW);
 
         tft_draw_string("Temp", col1_x, y_temp, TFT_WHITE, TFT_BG_COLOR, 2);
@@ -573,23 +574,23 @@ void ui_draw_compare_table(const ui_dual_i2c_data_t *d)
         tft_draw_string("AM2020DY:", col1_x, y_a2, TFT_CYAN, TFT_BG_COLOR, 1);
         tft_draw_string("AM2020DY:", col1_x, y_a3, TFT_CYAN, TFT_BG_COLOR, 1);
 
-        snprintf(buf, sizeof(buf), "TVOC:         ppb");
-        tft_draw_string(buf, col1_x + 60, y_a1, TFT_WHITE, TFT_BG_COLOR, 1);
-        snprintf(buf, sizeof(buf), "NO2:          ppb");
-        tft_draw_string(buf, col1_x + 60, y_a2, TFT_WHITE, TFT_BG_COLOR, 1);
-        snprintf(buf, sizeof(buf), "HCHO:         ppb");
-        tft_draw_string(buf, col1_x + 60, y_a3, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "TVOC:            ppb");
+        tft_draw_string(buf, col1_x + 96, y_a1, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "NO2:             ppb");
+        tft_draw_string(buf, col1_x + 96, y_a2, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "HCHO:            ppb");
+        tft_draw_string(buf, col1_x + 96, y_a3, TFT_WHITE, TFT_BG_COLOR, 1);
 
         tft_draw_string("SEN66:", col1_x, y_s1, TFT_GREEN, TFT_BG_COLOR, 1);
         tft_draw_string("SEN66:", col1_x, y_s2, TFT_GREEN, TFT_BG_COLOR, 1);
         tft_draw_string("SEN66:", col1_x, y_s3, TFT_GREEN, TFT_BG_COLOR, 1);
 
-        snprintf(buf, sizeof(buf), "CO2:          ppm");
-        tft_draw_string(buf, col1_x + 60, y_s1, TFT_WHITE, TFT_BG_COLOR, 1);
-        snprintf(buf, sizeof(buf), "NOx:          idx");
-        tft_draw_string(buf, col1_x + 60, y_s2, TFT_WHITE, TFT_BG_COLOR, 1);
-        snprintf(buf, sizeof(buf), "VOC:          idx");
-        tft_draw_string(buf, col1_x + 60, y_s3, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "CO2:             ppm");
+        tft_draw_string(buf, col1_x + 96, y_s1, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "NOx:             idx");
+        tft_draw_string(buf, col1_x + 96, y_s2, TFT_WHITE, TFT_BG_COLOR, 1);
+        snprintf(buf, sizeof(buf), "VOC:             idx");
+        tft_draw_string(buf, col1_x + 96, y_s3, TFT_WHITE, TFT_BG_COLOR, 1);
 
         tft_fill_rect(2, y_sep2, screen_w - 4, 2, TFT_YELLOW);
     }
@@ -631,30 +632,55 @@ void ui_draw_compare_table(const ui_dual_i2c_data_t *d)
     tft_draw_string(buf, col3_x, y_pm10, d->color_pm10, TFT_BG_COLOR, 2);
 
     /* AM2020DY unique */
-    tft_fill_rect(col1_x + 60, y_a1, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
-    snprintf(buf, sizeof(buf), "TVOC: %5u ppb", d->a_tvoc);
-    tft_draw_string(buf, col1_x + 60, y_a1, TFT_WHITE, TFT_BG_COLOR, 1);
+    tft_fill_rect(col1_x + 96, y_a1, 11 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "TVOC:    %5u ppb", d->a_tvoc);
+    tft_draw_string(buf, col1_x + 96, y_a1, d->color_tvoc, TFT_BG_COLOR, 1);
 
-    tft_fill_rect(col1_x + 60, y_a2, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
-    snprintf(buf, sizeof(buf), "NO2:  %5u ppb", d->a_no2);
-    tft_draw_string(buf, col1_x + 60, y_a2, TFT_WHITE, TFT_BG_COLOR, 1);
+    tft_fill_rect(col1_x + 96, y_a2, 11 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "NO2:     %5u ppb", d->a_no2);
+    tft_draw_string(buf, col1_x + 96, y_a2, d->color_no2, TFT_BG_COLOR, 1);
 
-    tft_fill_rect(col1_x + 60, y_a3, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
-    snprintf(buf, sizeof(buf), "HCHO: %5u ppb", d->a_hcho);
-    tft_draw_string(buf, col1_x + 60, y_a3, TFT_WHITE, TFT_BG_COLOR, 1);
+    tft_fill_rect(col1_x + 96, y_a3, 11 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "HCHO:    %5u ppb", d->a_hcho);
+    tft_draw_string(buf, col1_x + 96, y_a3, d->color_hcho, TFT_BG_COLOR, 1);
 
     /* SEN66 unique */
-    tft_fill_rect(col1_x + 60, y_s1, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
-    snprintf(buf, sizeof(buf), "CO2:  %5u ppm", d->s_co2);
-    tft_draw_string(buf, col1_x + 60, y_s1, d->color_co2, TFT_BG_COLOR, 1);
+    tft_fill_rect(col1_x + 96, y_s1, 11 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "CO2:     %5u ppm", d->s_co2);
+    tft_draw_string(buf, col1_x + 96, y_s1, d->color_co2, TFT_BG_COLOR, 1);
 
-    tft_fill_rect(col1_x + 60, y_s2, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
-    snprintf(buf, sizeof(buf), "NOx:  %5.1f idx", d->s_nox);
-    tft_draw_string(buf, col1_x + 60, y_s2, TFT_WHITE, TFT_BG_COLOR, 1);
+    tft_fill_rect(col1_x + 96, y_s2, 11 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "NOx:     %5.1f idx", d->s_nox);
+    tft_draw_string(buf, col1_x + 96, y_s2, d->color_nox, TFT_BG_COLOR, 1);
 
-    tft_fill_rect(col1_x + 60, y_s3, 8 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
-    snprintf(buf, sizeof(buf), "VOC:  %5.1f idx", d->s_voc);
-    tft_draw_string(buf, col1_x + 60, y_s3, d->color_voc, TFT_BG_COLOR, 1);
+    tft_fill_rect(col1_x + 96, y_s3, 11 * UI_CHAR_W, UI_CHAR_H, TFT_BG_COLOR);
+    snprintf(buf, sizeof(buf), "VOC:     %5.1f idx", d->s_voc);
+    tft_draw_string(buf, col1_x + 96, y_s3, d->color_voc, TFT_BG_COLOR, 1);
+
+    /* Status Bar */
+    int status_y = screen_h - UI_STATUS_BAR_HEIGHT;
+    if (s_last_alert_state != d->global_level) {
+        switch (d->global_level) {
+            case 0:
+                tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, TFT_BLUE);
+                tft_draw_string("* NORMAL *", (screen_w - 10 * UI_CHAR_W) / 2 + 2, status_y + 5,
+                               TFT_WHITE, TFT_BLUE, 2);
+                break;
+            case 1:
+                tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, TFT_ORANGE);
+                tft_draw_string("* WARNING *", (screen_w - 11 * UI_CHAR_W) / 2 + 2, status_y + 5,
+                               TFT_WHITE, TFT_ORANGE, 2);
+                break;
+            case 2:
+                tft_fill_rect(0, status_y, screen_w, UI_STATUS_BAR_HEIGHT, TFT_RED);
+                tft_draw_string("* DANGER !", (screen_w - 11 * UI_CHAR_W) / 2 + 2, status_y + 5,
+                               TFT_WHITE, TFT_RED, 2);
+                break;
+            default:
+                break;
+        }
+        s_last_alert_state = d->global_level;
+    }
 
     s_first_draw = false;
 }
