@@ -350,6 +350,9 @@ static bool read_and_display_dual_data(void)
     return is_alert;
 }
 
+    return is_alert;
+}
+
 void app_main(void)
 {
     configure_led();

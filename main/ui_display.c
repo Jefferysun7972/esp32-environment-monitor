@@ -43,7 +43,26 @@ void ui_draw_header(const char *sensor_name)
 
     tft_draw_string("ESP32 ", 5, 3, TFT_CYAN, TFT_BG_COLOR, 2);
 
-    {
+    const char *vs = strstr(sensor_name, " vs ");
+    if (vs) {
+        char left_name[16], right_name[16];
+        int left_len = vs - sensor_name;
+        strncpy(left_name, sensor_name, left_len);
+        left_name[left_len] = '\0';
+        strcpy(right_name, vs + 4);
+
+        int right_w = strlen(right_name) * UI_CHAR_W;
+        int x_right = screen_w - right_w - 5;
+        tft_draw_string(right_name, x_right, 3, TFT_CYAN, TFT_BG_COLOR, 2);
+
+        int vs_w = 2 * UI_CHAR_W;
+        int x_vs = x_right - vs_w - 4;
+        tft_draw_string("vs", x_vs, 3, TFT_YELLOW, TFT_BG_COLOR, 2);
+
+        int left_w = strlen(left_name) * UI_CHAR_W;
+        int x_left = x_vs - left_w - 4;
+        tft_draw_string(left_name, x_left, 3, TFT_GREEN, TFT_BG_COLOR, 2);
+    } else {
         int name_len = strlen(sensor_name);
         int x_sensor = screen_w - (name_len * 6) - 5;
         tft_draw_string(sensor_name, x_sensor, 7, TFT_GREEN, TFT_BG_COLOR, 1);
@@ -234,8 +253,11 @@ static void ui_draw_uart_sensor_screen(const ui_sensor_data_t *d)
 void ui_draw_sensor_screen(const ui_sensor_data_t *d)
 {
     if (g_sensor_type == SENSOR_UART) {
-    ui_draw_uart_sensor_screen(d);
-    return;
+        ui_draw_uart_sensor_screen(d);
+        return;
+    }
+    if (g_sensor_type == SENSOR_DUAL) {
+        return;
     }
 
     char buf[64];

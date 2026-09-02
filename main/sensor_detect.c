@@ -6,6 +6,7 @@
  */
 
 #include "sensor_config.h"
+#include "uart_sensor.h"
 #include <string.h>
 #include "esp_log.h"
 #include "driver/i2c_master.h"
@@ -131,75 +132,35 @@ int detect_uart_sensor(void) {
 int  detect_sensor_type(void) {
     int8_t product_name[32] = {0};
     int16_t error = 0;
-    
+
     ESP_LOGI(TAG, "🔍 Detecting sensor type via Get Product Name...");
-    
-    /* Try SEN5x unified product name first (all sensors support this command) */
-    error = sen5x_get_product_name((unsigned char*)product_name, sizeof(product_name));
-    
+
+    /* 1. Try 0x6B first (SEN66 / SEN68 address) */
+    ESP_LOGI(TAG, "   Probing 0x6B (SEN66/SEN68)...");
+    sen66_init(SEN66_I2C_ADDR_6B);
+    error = sen66_get_product_name(product_name, sizeof(product_name));
+
     if (error == 0 && strlen((char*)product_name) > 0) {
-        ESP_LOGI(TAG, "✅ Product Name detected: %s", (char*)product_name);
-        
-        /* Check sensor type based on product name string */
-        if (strstr((char*)product_name, "SEN68") != NULL) {
-            ESP_LOGI(TAG, "🎯 Sensor identified as: **SEN68** (Advanced)");
-            
-            g_sensor_type = SENSOR_SEN68;
-            g_sensor_name = "SEN68";
-            g_has_pm1_support = 1;
-            g_has_nox_support = 1;
-            g_has_hcho_support = 1;
-            g_has_co2_support = 0;
-            
-        } else if (strstr((char*)product_name, "SEN66") != NULL) {
-            ESP_LOGI(TAG, "🎯 Sensor identified as: **SEN66** (Standard)");
-            
-            g_sensor_type = SENSOR_SEN66;
-            g_sensor_name = "SEN66";
-            g_has_pm1_support = 0;
-            g_has_nox_support = 1;
-            g_has_hcho_support = 0;
-            g_has_co2_support = 1;
-            
-        } else if (strstr((char*)product_name, "SEN54") != NULL) {
-            ESP_LOGI(TAG, "🎯 Sensor identified as: **SEN54** (Basic)");
-            
-            g_sensor_type = SENSOR_SEN54;
-            g_sensor_name = "SEN54";
-            g_has_pm1_support = 1;
-            g_has_nox_support = 0;
-            g_has_hcho_support = 0;
-            g_has_co2_support = 0;
-            
-        } else {
-            ESP_LOGW(TAG, "⚠️ Unknown sensor type: %s", (char*)product_name);
-            ESP_LOGW(TAG, "   Defaulting to SEN66 mode");
-            
-            g_sensor_type = SENSOR_SEN66;
-            g_sensor_name = "SEN66";
-            g_has_pm1_support = 0;
-            g_has_nox_support = 1;
-            g_has_hcho_support = 0;
-            g_has_co2_support = 1;
-        }
-        
-        ESP_LOGI(TAG, "========================================");
-        ESP_LOGI(TAG, "Sensor Configuration:");
-        ESP_LOGI(TAG, "  Type:     %s", g_sensor_name);
-        ESP_LOGI(TAG, "  PM1.0:    %s", g_has_pm1_support ? "YES ✅" : "NO ❌");
-        ESP_LOGI(TAG, "  NOx:      %s", g_has_nox_support ? "YES ✅" : "NO ❌");
-        ESP_LOGI(TAG, "  HCHO:     %s", g_has_hcho_support ? "YES ✅" : "NO ❌");
-        ESP_LOGI(TAG, "  CO2:      %s", g_has_co2_support ? "YES ✅" : "NO ❌");
-        ESP_LOGI(TAG, "========================================");
-        
-        return 0;
-        
-    } else {
-        ESP_LOGE(TAG, "❌ Failed to read Product Name (error: %d)", error);
-        ESP_LOGE(TAG, "   Defaulting to SEN66 mode");
-        
-        return -1;
+        ESP_LOGI(TAG, "✅ Product Name detected at 0x6B: %s", (char*)product_name);
+        return identify_sensor((char*)product_name);
     }
+
+    ESP_LOGW(TAG, "   No response at 0x6B (error: %d)", error);
+
+    /* 2. Try 0x69 (SEN54 / SEN55 address) */
+    ESP_LOGI(TAG, "   Probing 0x69 (SEN54/SEN55)...");
+    memset(product_name, 0, sizeof(product_name));
+    error = sen5x_get_product_name((unsigned char*)product_name, sizeof(product_name));
+
+    if (error == 0 && strlen((char*)product_name) > 0) {
+        ESP_LOGI(TAG, "✅ Product Name detected at 0x69: %s", (char*)product_name);
+        return identify_sensor((char*)product_name);
+    }
+
+    ESP_LOGE(TAG, "❌ No I2C sensor found at 0x6B or 0x69 (error: %d)", error);
+    ESP_LOGE(TAG, "   Defaulting to SEN66 mode");
+
+    return -1;
 }
 
 /* ============================================ */
