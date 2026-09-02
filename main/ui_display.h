@@ -36,6 +36,9 @@ typedef struct {
     float s_tvoc;
     float s_nox;
     float s_hcho;
+    uint16_t s_co2;
+
+    uint8_t sen_type;
 
     uint16_t color_temp;
     uint16_t color_humid;
@@ -45,6 +48,7 @@ typedef struct {
     uint16_t color_hcho;
     uint16_t color_tvoc;
     uint16_t color_nox;
+    uint16_t color_co2;
     int global_level;
 } ui_dual_i2c_data_t;
 
@@ -128,7 +132,6 @@ void ui_draw_header(const char *sensor_name);
  * @param data  Pointer to sensor data structure with values and colors
  */
 void ui_draw_sensor_screen(const ui_sensor_data_t *data);
-void ui_draw_compare_table(const ui_dual_data_t *data);
 
 /**
  * @brief Draw dual I2C sensor comparison table

@@ -129,6 +129,44 @@ int detect_uart_sensor(void) {
     return 0;
 }
 
+static int identify_sensor(const char *product_name) {
+    if (strstr(product_name, "SEN54")) {
+        g_sensor_type = SENSOR_SEN54;
+        g_sensor_name = "SEN54";
+        g_has_nox_support = 0;
+        g_has_co2_support = 0;
+        g_has_hcho_support = 0;
+        ESP_LOGI(TAG, "Identified as SEN54 from product name: %s", product_name);
+        return 0;
+    } else if (strstr(product_name, "SEN68")) {
+        g_sensor_type = SENSOR_SEN68;
+        g_sensor_name = "SEN68";
+        g_has_nox_support = 1;
+        g_has_co2_support = 0;
+        g_has_hcho_support = 1;
+        ESP_LOGI(TAG, "Identified as SEN68 from product name: %s", product_name);
+        return 0;
+    } else if (strstr(product_name, "SEN66")) {
+        g_sensor_type = SENSOR_SEN66;
+        g_sensor_name = "SEN66";
+        g_has_nox_support = 1;
+        g_has_co2_support = 1;
+        g_has_hcho_support = 0;
+        ESP_LOGI(TAG, "Identified as SEN66 from product name: %s", product_name);
+        return 0;
+    } else if (strstr(product_name, "SEN55")) {
+        g_sensor_type = SENSOR_SEN54;  /* SEN55 uses same driver as SEN54 */
+        g_sensor_name = "SEN55";
+        g_has_nox_support = 1;
+        g_has_co2_support = 0;
+        g_has_hcho_support = 0;
+        ESP_LOGI(TAG, "Identified as SEN55 from product name: %s", product_name);
+        return 0;
+    }
+    ESP_LOGW(TAG, "Unknown product name: %s", product_name);
+    return -1;
+}
+
 int  detect_sensor_type(void) {
     int8_t product_name[32] = {0};
     int16_t error = 0;
