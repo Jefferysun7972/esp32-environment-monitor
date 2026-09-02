@@ -3,370 +3,205 @@
 [![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v5.3.5-blue.svg)](https://docs.espressif.com/projects/esp-idf/en/latest/)
 [![Platform](https://img.shields.io/badge/Platform-ESP32-green.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Release](https://img.shields.io/badge/Release-v1.0.0-orange.svg)](https://github.com/Jefferysun7972/esp32-environment-monitor/releases)
 
-**A multi-functional environmental monitoring system based on ESP32**, integrated with SEN66 environmental sensor and SSD1306 OLED display.
+**A multi-sensor environmental monitoring system based on ESP32**, integrating AM2020DY and SEN66/SEN68 sensors with ILI9341 TFT-LCD display and real-time comparison.
 
 ---
 
 ## ✨ Features
 
-### 🌡️ Environmental Monitoring
-- ✅ **Temperature**: Range -40°C ~ +70°C, Accuracy ±0.5°C
-- ✅ **Humidity**: Range 0 ~ 100% RH, Accuracy ±3% RH
-- ✅ **PM2.5 Concentration**: Real-time air quality monitoring
-- ✅ **CO₂ Concentration**: Indoor air quality monitoring
-- ✅ **VOC Index**: Volatile organic compounds monitoring
-- ✅ **NOx Index**: Nitrogen oxides monitoring
+### 🌡️ Multi-Sensor Support
+- **AM2020DY**: Temperature, Humidity, PM1.0, PM2.5, PM10, TVOC, NO2, HCHO (I2C frame protocol, addr 0x28)
+- **SEN66**: Temperature, Humidity, PM1.0, PM2.5, PM10, TVOC, NOx, CO2 (I2C, addr 0x6B)
+- **SEN68**: Temperature, Humidity, PM1.0, PM2.5, PM10, TVOC, NOx, HCHO (I2C, addr 0x6B)
+- **Auto-Detection**: SEN66/SEN68 identified via product name command; AM2020DY via command probe
 
-### 🖥️ Visual Display
-- ✅ **SSD1306 OLED**: 128×64 pixels yellow-blue dual-color display
-- ✅ **Professional UI Layout**: Optimized dual-color partition display
-- ✅ **Real-time Data Update**: Refresh sensor data every 5 seconds
-- ✅ **Progress Bar Indicator**: Intuitive display of PM2.5 and CO₂ concentration
-- ✅ **Warm-up Progress Interface**: Sensor startup countdown
+### 🖥️ TFT-LCD Display (ILI9341, 240×320)
+- **Dual Sensor Comparison**: Side-by-side AM2020DY vs SEN66/SEN68 readings
+- **Single Sensor Views**: Optimized layouts for AM2020DY, SEN66, and SEN68 individually
+- **Progress Bars**: Visual PM2.5 / CO2 / VOC level indicators
+- **Real-time Update**: 5-second refresh interval
+- **Title Bar**: App name + sensor names with "vs" comparison label
 
 ### 🔔 Smart Alert System
-- ✅ **PM2.5 Threshold**: Alert when > 75 µg/m³
-- ✅ **CO₂ Threshold**: Alert when > 1000 ppm
-- ✅ **LED Fast Flashing**: 200ms interval warning light
-- ✅ **Screen Status Prompt**: "ALERT!" / "OK" status display
+- **3-Color Level**: BLUE (Normal) → ORANGE (Warning) → RED (Danger)
+- **Multi-Parameter Thresholds**: Temp, Humidity, PM1.0, PM2.5, CO2, NOx, TVOC, HCHO
+- **LED Fast Flashing**: 200ms interval on GPIO2 when alert triggers
+- **Status Bar**: Color-coded status display at screen bottom
 
-### 💻 Technical Highlights
-- ✅ **Modular Design**: Component-based architecture, easy to extend
-- ✅ **Custom Driver**: Bypass esp_lcd compatibility issues
-- ✅ **I2C Bus Sharing**: Support multi-device simultaneous communication
-- ✅ **FreeRTOS Task Management**: Real-time operating system support
-- ✅ **Git Version Control**: Comprehensive branch management strategy
+### 💻 Architecture
+- **Modular Design**: `sensor_config`, `sensor_detect`, `alert_manager`, `ui_display`, `i2c_manager`
+- **I2C Bus Manager**: Centralized I2C bus sharing for multi-device communication
+- **FreeRTOS**: Task-based sensor reading and display updates
 
 ---
 
 ## 🛠️ Hardware Requirements
 
-### Core Components
-
-| Component | Model Specification | Quantity | Description |
-|-----------|---------------------|----------|-------------|
-| **Main Controller** | ESP32 DevKit V1 (ESP-WROOM-32) | 1 | Main controller |
-| **Environmental Sensor** | Sensirion SEN66 | 1 | Multi-parameter environmental sensor |
-| **OLED Display** | SSD1306 128×64 Yellow-Blue Dual-Color I2C | 1 | Data visualization |
-| **LED Indicator** | Red LED + 220Ω Resistor | 1 | Alert indicator |
-| **USB Cable** | Micro USB / USB-C | 1 | Power supply and programming |
+| Component | Specification | Qty | Description |
+|-----------|--------------|-----|-------------|
+| **Main Controller** | ESP32 DevKit V1 | 1 | ESP-WROOM-32 |
+| **Sensor A** | AM2020DY | 1 | Multi-parameter sensor (I2C frame protocol) |
+| **Sensor B** | Sensirion SEN66 or SEN68 | 1 | Multi-parameter sensor (I2C, auto-detected) |
+| **TFT Display** | ILI9341 240×320 SPI | 1 | 2.4" TFT LCD |
+| **LED** | Red LED + 220Ω Resistor | 1 | Alert indicator on GPIO2 |
+| **USB Cable** | Micro USB | 1 | Power and programming |
 
 ---
 
-## 🔌 Wiring Instructions
+## 🔌 Wiring
 
-### Connection 1: ESP32 to SEN66 Sensor
+### AM2020DY Sensor (I2C, addr 0x28)
 
-| ESP32 Pin | SEN66 Pin | Description |
-|-----------|-----------|-------------|
-| **3.3V** | VCC | Power supply (3.3V) |
+| ESP32 Pin | AM2020DY Pin | Description |
+|-----------|-------------|-------------|
+| **3.3V** | VCC | Power |
 | **GND** | GND | Ground |
-| **GPIO21** | SDA | I2C Data Line |
-| **GPIO22** | SCL | I2C Clock Line |
+| **GPIO21** | SDA | I2C Data |
+| **GPIO22** | SCL | I2C Clock |
 
-**SEN66 I2C Address**: `0x69` (default)
+### SEN66/SEN68 Sensor (I2C, addr 0x6B)
 
----
-
-### Connection 2: ESP32 to OLED Display (SSD1306)
-
-| ESP32 Pin | OLED Pin | Description |
-|-----------|----------|-------------|
-| **3.3V** | VCC | Power supply (3.3V) |
+| ESP32 Pin | SEN Pin | Description |
+|-----------|---------|-------------|
+| **3.3V** | VCC | Power |
 | **GND** | GND | Ground |
-| **GPIO21** | SDA | I2C Data Line (**shared with SEN66**) |
-| **GPIO22** | SCL | I2C Clock Line (**shared with SEN66**) |
+| **GPIO21** | SDA | I2C Data (shared) |
+| **GPIO22** | SCL | I2C Clock (shared) |
 
-> ⚠️ **Important**: OLED and SEN66 share the same I2C bus!
->
-> Both devices connect to the same GPIO21 (SDA) and GPIO22 (SCL) pins.
+### ILI9341 TFT LCD (SPI)
 
-**OLED I2C Address**: 
-- Default: `0x3C`
-- Alternative: `0x3D` (change via onboard resistor)
+| ESP32 Pin | TFT Pin | Description |
+|-----------|---------|-------------|
+| **3.3V** | VCC | Power |
+| **GND** | GND | Ground |
+| **GPIO18** | SCK | SPI Clock |
+| **GPIO23** | MOSI | SPI MOSI |
+| **GPIO5** | CS | Chip Select |
+| **GPIO4** | DC | Data/Command |
+| **GPIO16** | RST | Reset |
+| **GPIO17** | BLK | Backlight |
 
----
+### LED Alert
 
-### Connection 3: LED Alert Light
+| ESP32 Pin | Component |
+|-----------|-----------|
+| **GPIO2** | → 220Ω Resistor → LED(+) → LED(-) → GND |
 
-**Components needed:**
-- 1× Red LED (or any color)
-- 1× 220Ω Resistor
-- 2× Jumper wires
+### Complete Pin Summary
 
-**Wiring steps:**
-1. Connect **GPIO2** → Resistor (one end)
-2. Connect Resistor (other end) → **LED Anode (+)** (longer leg)
-3. Connect **LED Cathode (-)** (shorter leg) → **GND**
-
-**Summary table:**
-
-| Component | Connection |
-|-----------|------------|
-| ESP32 GPIO2 | → 220Ω Resistor → LED(+) |
-| LED(-) | → GND |
-
-**Note**: LED is configured on **GPIO2 (D2 pin)**
-
----
-
-### Complete Connection Summary
-
-**All connections at a glance:**
-
-| ESP32 Pin | Connected To | Function |
-|-----------|--------------|----------|
-| **3.3V** | SEN66(VCC), OLED(VCC) | Power for sensors & display |
-| **GND** | SEN66(GND), OLED(GND), LED(-) | Common ground |
-| **GPIO21** | SEN66(SDA), OLED(SDA) | I2C Data (shared bus) |
-| **GPIO22** | SEN66(SCL), OLED(SCL) | I2C Clock (shared bus) |
-| **GPIO2** | LED(via 220Ω resistor) | Alert indicator output |
-
-**Key points:**
-- ✅ Only **5 pins** used on ESP32
-- ✅ I2C bus supports **multiple devices** (SEN66 + OLED)
-- ✅ LED uses simple **digital output** mode
+| ESP32 Pin | Connected To |
+|-----------|-------------|
+| GPIO2 | LED (alert) |
+| GPIO4 | TFT DC |
+| GPIO5 | TFT CS |
+| GPIO16 | TFT RST |
+| GPIO17 | TFT BLK |
+| GPIO18 | TFT SCK |
+| GPIO21 | AM2020DY SDA + SEN SDA |
+| GPIO22 | AM2020DY SCL + SEN SCL |
+| GPIO23 | TFT MOSI |
 
 ---
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+- ESP-IDF v5.3.5+
+- Python 3.8+
+- USB Driver (CP210x / CH340)
 
-- ✅ **ESP-IDF v5.3.5** or higher
-- ✅ **Python 3.8+** (for IDF toolchain)
-- ✅ **Git** (for cloning repository and submodules)
-- ✅ **USB Driver** (CP210x or CH340)
-- ✅ **Serial Terminal Tool** (like screen, minicom, PuTTY)
-
-### Installation Steps
-
-#### 1️⃣ Clone the Project
+### Build & Flash
 
 ```bash
-git clone --recursive https://github.com/Jefferysun7972/esp32-environment-monitor.git cd esp32-environment-monitor git submodule update --init --recursive
-
-
-Plain Text
-
-
-#### 2️⃣ Configure ESP-IDF Environment
-
-```bash
-source ~/esp/esp-idf/export.sh idf.py --version
-
-Expected output: v5.3.5
-
-Plain Text
-
-
-#### 3️⃣ Configure and Build
-
-```bash
-idf.py set-target esp32 idf.py fullclean idf.py build
-
-
-Plain Text
-
-
-#### 4️⃣ Flash Firmware
-
-```bash
-macOS Example:
-idf.py -p /dev/cu.usbserial-110 flash monitor
-
-Linux Example:
-idf.py -p /dev/ttyUSB0 flash monitor
-
-Windows Example:
-idf.py -p COM3 flash monitor
-
-
-Plain Text
-
+git clone --recursive https://github.com/Jefferysun7972/esp32-environment-monitor.git
+cd esp32-environment-monitor
+source ~/esp/esp-idf/export.sh
+idf.py set-target esp32
+idf.py build
+idf.py -p /dev/cu.usbserial-* flash monitor
+```
 
 ---
 
-## 🖥️ OLED Display Interface
+## 🖥️ Display Layouts
 
-### Display Layout Design
+The system supports multiple display modes selected automatically based on detected sensors:
 
-Optimized layout for **Yellow-Blue Dual-Color SSD1306 OLED**:
+### Dual I2C Comparison (AM2020DY + SEN66/SEN68)
 
-**Screen dimensions**: 128 pixels (wide) × 64 pixels (high)
+```
+┌──────────────────────────────────────────┐
+│ ESP32  AM2020DY vs SEN68    @FELLOWES   │ ← Title Bar (font 1)
+│ Environment Monitor                      │
+│──────────────────────────────────────────│
+│          AM2020          SEN66           │
+│ Temp     xx.x            xx.x            │
+│ Hum      xx.x            xx.x            │
+│ PM1.0    xxx.x           xxx.x           │
+│ PM2.5    xxx.x           xxx.x           │
+│ PM10     xxx.x           xxx.x           │
+│ TVOC     xxx.x           xxx.x           │
+│ NOx      xxx.x           xxx.x           │
+│──────────────────────────────────────────│
+│ HCHO     xxx.x                           │
+│ CO2                     xxx              │
+├──────────────────────────────────────────┤
+│              * NORMAL *                  │ ← Status Bar
+└──────────────────────────────────────────┘
+```
 
-**Layout structure (from top to bottom):**
-
-| Row | Y-Position | Content | Color Zone |
-|-----|-----------|---------|------------|
-| **Border** | 0, 63 | Frame border (inset 1px) | - |
-| **Margin** | 0-5 | Empty space | - |
-| **Title** | **6-13** | Temperature & Humidity + Status | 🟨 **Yellow** |
-| **Buffer** | 14-15 | Transition space | - |
-| **PM2.5 Data** | **16-23** | PM2.5 value + unit | 🔵 **Blue** |
-| **PM2.5 Bar** | **24-29** | Progress bar (6px height) | 🔵 **Blue** |
-| **CO₂ Data** | **32-39** | CO₂ value + unit | 🔵 **Blue** |
-n| **CO₂ Bar** | **40-45** | Progress bar (6px height) | 🔵 **Blue** |
-| **VOC/NOx** | **50-57** | VOC and NOx values | 🔵 **Blue** |
-| **Border** | 63 | Bottom frame line | - |
-
-### Color Partition Strategy
-
-| Area | Row Range | Usage | Color |
-|------|-----------|-------|-------|
-| **Margin Zone** | y = 0-5 | Top margin | - |
-| **Title Zone** | y = 6-13 | Temperature + Humidity + Status | 🟨 **Yellow** |
-| **Buffer Zone** | y = 14-15 | Yellow-blue transition | - |
-| **Data Zone** | y = 16-63 | All sensor data | 🔵 **Blue** |
-
-### Display Modes
-
-#### 🟢 Normal Mode
-T:25.3c H:55% OK 
-PM2.5: 12.5 ug/m3 
-[████░░░░░░░░░░░░░░░░░░░] 
-CO2: 650 ppm 
-[░░░░░░░░░░░░░░░░░░░░░░░░░] 
-VOC:45 NOX:2
-
-
-Plain Text
-
-
-#### 🔴 Alert Mode
-T:28.1c H:70% ALERT! 
-PM2.5: 89.2 ug/m3 
-[███████████████████████████] 
-CO2: 1250 ppm 
-[████████████████████████████] 
-VOC:120 NOX:15
-
-
-Plain Text
-
-*(LED flashes rapidly simultaneously)*
-
-#### ⏳ Warm-up Mode
-
-Plain Text
-
- Warming up: 10s
-┌──────────────────┐ 
-│████████░░░░░░░░░░│ ← Thin progress bar (14px) 
-└──────────────────┘ 67% 5/15 sec
-
-
-Plain Text
-
+### Single Sensor Views
+- **AM2020DY**: Full-screen with progress bars for all parameters
+- **SEN66**: Includes CO2
+- **SEN68**: Includes HCHO
 
 ---
 
-## ⚙️ Configuration Parameters
+## ⚙️ Configuration
 
-### Sensor Thresholds (`main/blink_example_main.c`):
+### Sensor Thresholds (`main/app_config.h`)
 
-```c
-#define PM25_ALERT_THRESHOLD 75 // µg/m³ #define CO2_ALERT_THRESHOLD 1000 // ppm
+| Parameter | Normal | Warning | Danger |
+|-----------|--------|---------|--------|
+| **Temperature** | 18–26°C | 10–35°C | <10 or >35°C |
+| **Humidity** | 40–70% | 20–90% | <20 or >90% |
+| **PM1.0** | <25 µg/m³ | <50 µg/m³ | ≥50 µg/m³ |
+| **PM2.5** | <35 µg/m³ | <75 µg/m³ | ≥75 µg/m³ |
+| **CO2** | <800 ppm | <1200 ppm | ≥1200 ppm |
+| **NOx** | <100 | <200 | ≥200 |
 
-
-Plain Text
-
-
-### I2C Configuration:
-
-```c
-#define I2C_MASTER_SCL_IO 22 // Clock pin #define I2C_MASTER_SDA_IO 21 // Data pin #define I2C_MASTER_FREQ_HZ 100000 // 100kHz
-
-
-Plain Text
-
-
-### OLED Special Configuration
-
-Perfect parameters for your OLED module (built-in):
+### Display Selection (`main/blink_example_main.c`)
 
 ```c
-// SSD1306 initialization commands oled_custom_send_command(dev, 0xA1); // Segment Re-map: fix horizontal mirror oled_custom_send_command(dev, 0xC8); // Scan Direction: fix vertical flip
-
-// Font rendering bit operation if (col_data & (0x01 << row)) { // LSB=top: fix character flip
-
-
-Plain Text
-
-
----
-
-## 🐛 Troubleshooting
-
-### ❌ OLED Garbled Display
-1. Check I2C address (0x3C or 0x3D)
-2. Verify wiring connections
-3. Try reducing I2C frequency to 50kHz
-
-### ❌ Character Flip
-```c
-// Fix horizontal mirror oled_custom_send_command(dev, 0xA1);
-
-// Fix vertical flip oled_custom_send_command(dev, 0xC8);
-
-// Fix character inversion if (col_data & (0x01 << row)) {
-
-
-Plain Text
-
-
-### ❌ Sensor Reads Zero
-- Wait 15 seconds for sensor warm-up
-- Check I2C wiring
-- Verify sensor is not damaged
+#define USE_TFT_LCD      1    // ILI9341 TFT-LCD (active)
+#define USE_OLED_DISPLAY 0    // SSD1306 OLED (disabled)
+```
 
 ---
 
 ## 🗺️ Roadmap
 
-### v1.0.0 (Current) ✅
-- [x] LED control
-- [x] SEN66 sensor integration
-- [x] Alert system
-- [x] SSD1306 OLED display
-- [x] Dual-color layout optimization
+### v1.0.0 ✅
+- LED alert, SEN66/SEN68 integration, auto-detection, TFT-LCD display, multi-sensor comparison
 
 ### v1.1.0 (Planned)
-- [ ] WiFi data upload
-- [ ] Web configuration
-- [ ] OTA updates
-
-### v2.0.0 (Future)
-- [ ] TFT-LCD integration
-- [ ] RTOS optimization
-- [ ] Touchscreen support
+- WiFi data upload, Web configuration, OTA updates
 
 ---
 
 ## 📄 License
 
-This project is licensed under the **MIT License**.
-
-See [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- [Espressif Systems](https://www.espressif.com/) - ESP32 and ESP-IDF
-- [Sensirion](https://www.sensirion.com/) - SEN66 sensor driver
-- [Adafruit](https://www.adafruit.com/) - GFX library and fonts
+- [Espressif](https://www.espressif.com/) - ESP32 & ESP-IDF
+- [Sensirion](https://www.sensirion.com/) - SEN sensor drivers
 - [FreeRTOS](https://www.freertos.org/) - RTOS
 
 ---
 
-## 📞 Contact
-
-- **GitHub**: [Jefferysun7972](https://github.com/Jefferysun7972)
-- **Issues**: [Submit Issue](https://github.com/Jefferysun7972/esp32-environment-monitor/issues)
-
----
-
-**Last Updated**: 2026-08-12 | **Version**: v1.0.0 | **Maintainer**: Jefferysun7972
+**Last Updated**: 2026-09-02 | **Maintainer**: [Jefferysun7972](https://github.com/Jefferysun7972)
