@@ -102,14 +102,6 @@ esp_err_t am2020dy_read_measurement(i2c_master_dev_handle_t dev_handle, am2020dy
         return err;
     }
 
-    /* Dump raw bytes for debugging */
-    ESP_LOGI(TAG, "RAW[%d]:", rx_buf[1]);
-    for (int i = 0; i < 32; i++) {
-        printf("%02X ", rx_buf[i]);
-        if ((i + 1) % 16 == 0) printf("\n");
-    }
-    printf("\n");
-
     uint8_t data_len = rx_buf[1];
     uint8_t cs_pos   = 2 + data_len;
 
@@ -130,9 +122,6 @@ esp_err_t am2020dy_read_measurement(i2c_master_dev_handle_t dev_handle, am2020dy
 
     float temp = (temp_raw - 500) / 10.0f;
     float hum  = hum_raw / 10.0f;
-
-    ESP_LOGI(TAG, "T:%.1fC H:%.1f%% PM1:%u PM2.5:%u PM10:%u TVOC:%u NO2:%u HCHO:%u",
-             temp, hum, pm1_0, pm2_5, pm10, tvoc, no2, hcho);
 
     if (out_data) {
         out_data->tvoc        = tvoc;

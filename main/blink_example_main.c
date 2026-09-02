@@ -35,9 +35,10 @@
 #include "alert_manager.h"
 #include "ui_display.h"
 
+#include <math.h>
 #include "am2020dy.h"
 #include "sensirion_i2c_hal.h"
-#include "sen66_i2c.h"
+#include "sen68_i2c.h"
 #include "sensirion_common.h"
 
 #if USE_TFT_LCD
@@ -59,7 +60,7 @@ static uint8_t s_led_state = 0;
 static bool s_alert_active = false;
 static int s_alert_blink_counter = 0;
 static i2c_master_dev_handle_t s_am2020dy_dev_handle = NULL;
-static bool g_sen66_ready = false;
+static bool g_sen68_ready = false;
 static bool g_am2020dy_ready = false;
 
 #ifdef CONFIG_BLINK_LED_STRIP
@@ -211,40 +212,40 @@ static bool read_and_display_am2020dy_data(void)
     return is_alert;
 }
 
-static void init_sen66_sensor(void)
+static void init_sen68_sensor(void)
 {
-    ESP_LOGI(TAG, "Initializing SEN66 sensor...");
+    ESP_LOGI(TAG, "Initializing SEN68 sensor...");
 
     sensirion_i2c_hal_init();
 
-    sen66_init(SEN66_I2C_ADDR_6B);
+    sen68_init(SEN68_I2C_ADDR_6B);
 
-    int16_t err = sen66_device_reset();
+    int16_t err = sen68_device_reset();
     if (err != NO_ERROR) {
-        ESP_LOGW(TAG, "SEN66 device reset failed (error: %d), continuing...", err);
+        ESP_LOGW(TAG, "SEN68 device reset failed (error: %d), continuing...", err);
     }
     vTaskDelay(pdMS_TO_TICKS(100));
 
     int8_t product_name[32] = {0};
-    err = sen66_get_product_name(product_name, sizeof(product_name));
+    err = sen68_get_product_name(product_name, sizeof(product_name));
     if (err != NO_ERROR) {
-        ESP_LOGE(TAG, "❌ SEN66 not detected (error: %d)", err);
+        ESP_LOGE(TAG, "❌ SEN68 not detected (error: %d)", err);
         return;
     }
-    ESP_LOGI(TAG, "SEN66 product name: %s", (char*)product_name);
+    ESP_LOGI(TAG, "SEN68 product name: %s", (char*)product_name);
 
-    err = sen66_start_continuous_measurement();
+    err = sen68_start_continuous_measurement();
     if (err != NO_ERROR) {
-        ESP_LOGE(TAG, "❌ SEN66 failed to start measurement (error: %d)", err);
+        ESP_LOGE(TAG, "❌ SEN68 failed to start measurement (error: %d)", err);
         return;
     }
 
     vTaskDelay(pdMS_TO_TICKS(1000));
 
-    g_sen66_ready = true;
+    g_sen68_ready = true;
     g_has_am2020dy = 1;
     g_display_mode = DISPLAY_MODE_DUAL;
-    g_sensor_name = "AM2020DY vs SEN66";
+    g_sensor_name = "AM2020DY vs SEN68";
     g_sensor_type = SENSOR_DUAL_I2C;
 
 #if USE_TFT_LCD
@@ -252,8 +253,8 @@ static void init_sen66_sensor(void)
     ESP_LOGI(TAG, "Title bar updated: %s", g_sensor_name);
 #endif
 
-    ESP_LOGI(TAG, "🎉 SEN66 sensor initialized successfully!");
-    ESP_LOGI(TAG, "Dual I2C sensor mode: AM2020DY + SEN66");
+    ESP_LOGI(TAG, "🎉 SEN68 sensor initialized successfully!");
+    ESP_LOGI(TAG, "Dual I2C sensor mode: AM2020DY + SEN68");
 }
 
 static bool read_and_display_dual_data(void)
@@ -261,42 +262,46 @@ static bool read_and_display_dual_data(void)
     am2020dy_data_t a_data;
     uint16_t s_pm1, s_pm25, s_pm4, s_pm10;
     int16_t s_hum, s_temp, s_voc, s_nox;
-    uint16_t s_co2;
+    uint16_t s_hcho;
 
     bool a_ok = (am2020dy_read_measurement(s_am2020dy_dev_handle, &a_data) == ESP_OK);
-    bool s_ok = (sen66_read_measured_values_as_integers(
+    bool s_ok = (sen68_read_measured_values_as_integers(
                      &s_pm1, &s_pm25, &s_pm4, &s_pm10,
-                     &s_hum, &s_temp, &s_voc, &s_nox, &s_co2) == NO_ERROR);
+                     &s_hum, &s_temp, &s_voc, &s_nox, &s_hcho) == NO_ERROR);
 
     if (!a_ok) {
         ESP_LOGW(TAG, "Failed to read AM2020DY data");
     }
     if (!s_ok) {
-        ESP_LOGW(TAG, "Failed to read SEN66 data");
+        ESP_LOGW(TAG, "Failed to read SEN68 data");
     }
 
+    float s_temp_f = s_temp / 200.0f;
+    float s_hum_f = s_hum / 100.0f;
+    float s_voc_f = s_voc / 10.0f;
+    float s_nox_f = s_nox / 10.0f;
+    float s_hcho_f = s_hcho / 10.0f;
+
+    float voc_clamped = (s_voc_f > 500.0f) ? 500.0f : s_voc_f;
+    float s_tvoc_f = (logf(501.0f - voc_clamped) - 6.24f) * (-313.6f);
+
     if (a_ok) {
-        ESP_LOGI(TAG, "[AM2020DY] T:%.1fC H:%.1f%% PM1:%u PM2.5:%u PM10:%u TVOC:%u NO2:%u HCHO:%u",
+        ESP_LOGI(TAG, "[AM2020DY] T:%5.1fC H:%5.1f%% PM1:%4u PM2.5:%4u PM10:%4u TVOC:%5u NO2:%4u HCHO:%6u",
                  a_data.temperature, a_data.humidity,
                  a_data.pm1_0, a_data.pm2_5, a_data.pm10,
                  a_data.tvoc, a_data.no2, a_data.hcho);
     }
     if (s_ok) {
-        ESP_LOGI(TAG, "[SEN66] T:%.1fC H:%.1f%% PM1:%u PM2.5:%u PM10:%u VOC:%d NOx:%d CO2:%u",
-                 s_temp / 200.0f, s_hum / 100.0f,
+        ESP_LOGI(TAG, "[SEN68   ] T:%5.1fC H:%5.1f%% PM1:%4u PM2.5:%4u PM10:%4u TVOC:%5.1f NOx:%4.1f HCHO:%6.1f",
+                 s_temp_f, s_hum_f,
                  s_pm1, s_pm25, s_pm10,
-                 s_voc, s_nox, s_co2);
+                 s_tvoc_f, s_nox_f, s_hcho_f);
     }
 
     float a_temp = a_data.temperature;
     float a_hum = a_data.humidity;
-    float s_temp_f = s_temp / 200.0f;
-    float s_hum_f = s_hum / 100.0f;
-    float s_nox_f = s_nox / 10.0f;
-    float s_voc_f = s_voc / 10.0f;
-
     float pm25_for_alert = a_ok ? (float)a_data.pm2_5 : (float)s_pm25;
-    bool is_alert = alert_check_environmental(pm25_for_alert, s_co2);
+    bool is_alert = alert_check_environmental(pm25_for_alert, 0);
 
     if (is_alert != s_alert_active) {
         if (is_alert) {
@@ -323,20 +328,17 @@ static bool read_and_display_dual_data(void)
             .s_pm1      = (float)s_pm1,
             .s_pm25     = (float)s_pm25,
             .s_pm10     = (float)s_pm10,
+            .s_tvoc     = s_tvoc_f,
             .s_nox      = s_nox_f,
-            .s_voc      = s_voc_f,
-            .s_co2      = s_co2,
-            .color_temp  = alert_get_color(a_temp, TEMP_NORMAL_MIN, TEMP_NORMAL_MAX, TEMP_DANGER_MAX, true),
-            .color_humid = alert_get_color(a_hum, HUMID_NORMAL_MIN, HUMID_NORMAL_MAX, HUMID_DANGER_MAX, true),
-            .color_pm1   = alert_get_color((float)a_data.pm1_0, 0, PM1_NORMAL_MAX, PM1_WARNING_MAX, false),
-            .color_pm25  = alert_get_color((float)a_data.pm2_5, 0, PM25_NORMAL_MAX, PM25_WARNING_MAX, false),
-            .color_pm10  = alert_get_color((float)a_data.pm10, 0, PM10_NORMAL_MAX, PM10_WARNING_MAX, false),
-            .color_tvoc  = alert_get_color((float)a_data.tvoc, 0, VOC_NORMAL_MAX, VOC_WARNING_MAX, false),
-            .color_no2   = alert_get_color((float)a_data.no2, 0, NOX_NORMAL_MAX, NOX_WARNING_MAX, false),
-            .color_hcho  = alert_get_color((float)a_data.hcho, 0, HCHO_NORMAL_MAX, HCHO_WARNING_MAX, false),
-            .color_co2   = alert_get_color((float)s_co2, 0, CO2_NORMAL_MAX, CO2_WARNING_MAX, false),
-            .color_nox   = alert_get_color(s_nox_f, 0, NOX_NORMAL_MAX, NOX_WARNING_MAX, false),
-            .color_voc   = alert_get_color(s_voc_f, 0, VOC_NORMAL_MAX, VOC_WARNING_MAX, false),
+            .s_hcho     = s_hcho_f,
+            .color_temp  = alert_get_color(fmaxf(a_temp, s_temp_f), TEMP_NORMAL_MIN, TEMP_NORMAL_MAX, TEMP_DANGER_MAX, true),
+            .color_humid = alert_get_color(fmaxf(a_hum, s_hum_f), HUMID_NORMAL_MIN, HUMID_NORMAL_MAX, HUMID_DANGER_MAX, true),
+            .color_pm1   = alert_get_color(fmaxf((float)a_data.pm1_0, (float)s_pm1), 0, PM1_NORMAL_MAX, PM1_WARNING_MAX, false),
+            .color_pm25  = alert_get_color(fmaxf((float)a_data.pm2_5, (float)s_pm25), 0, PM25_NORMAL_MAX, PM25_WARNING_MAX, false),
+            .color_pm10  = alert_get_color(fmaxf((float)a_data.pm10, (float)s_pm10), 0, PM10_NORMAL_MAX, PM10_WARNING_MAX, false),
+            .color_hcho  = alert_get_color(fmaxf((float)a_data.hcho, (float)s_hcho), 0, HCHO_NORMAL_MAX, HCHO_WARNING_MAX, false),
+            .color_tvoc  = alert_get_color(fmaxf((float)a_data.tvoc, s_tvoc_f), 0, VOC_NORMAL_MAX, VOC_WARNING_MAX, false),
+            .color_nox   = alert_get_color((float)a_data.no2, 0, NOX_NORMAL_MAX, NOX_WARNING_MAX, false),
             .global_level = alert_get_global_level(a_temp, a_hum, (float)a_data.no2,
                                                     (float)a_data.pm2_5, a_data.hcho,
                                                     (float)a_data.tvoc, 1),
@@ -383,12 +385,12 @@ void app_main(void)
         }
     }
 
-    /* Initialize SEN66 sensor */
-    init_sen66_sensor();
+    /* Initialize SEN68 sensor */
+    init_sen68_sensor();
 
-    if (g_sen66_ready) {
+    if (g_sen68_ready) {
         g_display_mode = DISPLAY_MODE_DUAL;
-        g_sensor_name = "AM2020DY vs SEN66";
+        g_sensor_name = "AM2020DY vs SEN68";
     } else {
         g_display_mode = DISPLAY_MODE_SINGLE;
         g_sensor_name = "AM2020DY";
@@ -405,7 +407,7 @@ void app_main(void)
     while (1) {
         bool alert_active;
 
-        if (g_sen66_ready) {
+        if (g_sen68_ready) {
             alert_active = read_and_display_dual_data();
         } else {
             alert_active = read_and_display_am2020dy_data();
