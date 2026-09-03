@@ -13,4 +13,7 @@ idf_component_register(
         am2020dy
         oled_display
         tft_lcd
+        wifi_web
+        mqtt_cloud
+        influxdb_writer
 )
