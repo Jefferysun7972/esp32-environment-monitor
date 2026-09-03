@@ -84,7 +84,7 @@ int16_t sensor_read_measured_values(uint16_t* pm1p0, uint16_t* pm2p5,
 /* COMMON CONSTANTS (shared by both sensors)    */
 /* ============================================ */
 #define SENSOR_I2C_ADDR             0x6B
-#define SENSOR_READ_PERIOD_MS        5000    /* Read interval: 5 seconds */
+#define SENSOR_READ_PERIOD_MS        20000   /* Read interval: 20 seconds */
 #define SENSOR_WARMUP_DELAY_MS       15000   /* Warm-up time: 15 seconds */
 #define SENSOR_WARMUP_READINGS       3       /* Skip first N readings */
 

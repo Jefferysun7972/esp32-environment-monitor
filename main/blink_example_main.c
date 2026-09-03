@@ -35,6 +35,8 @@
 #include "alert_manager.h"
 #include "ui_display.h"
 #include "wifi_web.h"
+#include "mqtt_cloud.h"
+#include "influxdb_writer.h"
 
 #include <math.h>
 #include "am2020dy.h"
@@ -213,7 +215,7 @@ static bool read_and_display_am2020dy_data(void)
 #endif
 
     {
-        wifi_sensor_data_t wd = {
+        mqtt_sensor_data_t wd = {
             .am2020dy_temp = data.temperature,
             .am2020dy_humi = data.humidity,
             .am2020dy_pm1  = (float)data.pm1_0,
@@ -226,10 +228,9 @@ static bool read_and_display_am2020dy_data(void)
             .alert_level = alert_get_global_level(data.temperature, data.humidity,
                             0, (float)data.pm2_5, 0, (float)data.tvoc, 0),
         };
-        snprintf(wd.am2020dy_name, sizeof(wd.am2020dy_name), "AM2020DY");
-        snprintf(wd.alert_msg, sizeof(wd.alert_msg), "%s",
-                 is_alert ? "PM2.5 Alert!" : "Normal");
-        wifi_web_update_data(&wd);
+        snprintf(wd.sen_name, sizeof(wd.sen_name), "none");
+        mqtt_cloud_publish(&wd);
+        influxdb_writer_send(&wd);
     }
 
     return is_alert;
@@ -414,7 +415,7 @@ static bool read_and_display_dual_data(void)
 #endif
 
     {
-        wifi_sensor_data_t wd = {
+        mqtt_sensor_data_t wd = {
             .am2020dy_temp = a_temp,
             .am2020dy_humi = a_hum,
             .am2020dy_pm1  = (float)a_data.pm1_0,
@@ -436,12 +437,10 @@ static bool read_and_display_dual_data(void)
             .alert_level = alert_get_global_level(a_temp, a_hum, (float)a_data.no2,
                             (float)a_data.pm2_5, a_data.hcho, (float)a_data.tvoc, 1),
         };
-        snprintf(wd.am2020dy_name, sizeof(wd.am2020dy_name), "AM2020DY");
         snprintf(wd.sen_name, sizeof(wd.sen_name), "%s",
                  g_sen_type == 66 ? "SEN66" : "SEN68");
-        snprintf(wd.alert_msg, sizeof(wd.alert_msg), "%s",
-                 is_alert ? "Environmental Alert!" : "Normal");
-        wifi_web_update_data(&wd);
+        mqtt_cloud_publish(&wd);
+        influxdb_writer_send(&wd);
     }
 
     return is_alert;
@@ -501,7 +500,13 @@ void app_main(void)
              g_sensor_name, SENSOR_READ_PERIOD_MS);
 
     wifi_web_init();
-    ESP_LOGI(TAG, "WiFi and Web server started");
+    ESP_LOGI(TAG, "WiFi connected: %s", wifi_web_get_ip_str());
+
+    mqtt_cloud_init();
+    ESP_LOGI(TAG, "MQTT cloud client started");
+
+    influxdb_writer_init();
+    ESP_LOGI(TAG, "InfluxDB writer started");
 
     while (1) {
         bool alert_active;
