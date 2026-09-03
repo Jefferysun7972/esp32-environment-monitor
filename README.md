@@ -4,7 +4,7 @@
 [![Platform](https://img.shields.io/badge/Platform-ESP32-green.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**A multi-sensor environmental monitoring system based on ESP32**, integrating AM2020DY and SEN66/SEN68 sensors with ILI9341 TFT-LCD display and real-time comparison.
+**A multi-sensor environmental monitoring system based on ESP32**, integrating AM2020DY and SEN66/SEN68 sensors with ILI9341 TFT-LCD display, cloud data upload, and real-time visualization.
 
 ---
 
@@ -20,8 +20,14 @@
 - **Dual Sensor Comparison**: Side-by-side AM2020DY vs SEN66/SEN68 readings
 - **Single Sensor Views**: Optimized layouts for AM2020DY, SEN66, and SEN68 individually
 - **Progress Bars**: Visual PM2.5 / CO2 / VOC level indicators
-- **Real-time Update**: 5-second refresh interval
+- **Real-time Update**: 20-second refresh interval
 - **Title Bar**: App name + sensor names with "vs" comparison label
+
+### ☁️ Cloud Integration
+- **MQTT Upload**: Real-time data publishing to EMQX Cloud for mobile monitoring (MQTTX App)
+- **InfluxDB Storage**: Direct HTTP write to InfluxDB Cloud for historical data storage (30-day retention)
+- **Grafana Visualization**: Rich dashboards with multi-sensor comparison, correlation charts, and alerts
+- **Data Architecture**: `ESP32 → MQTT → EMQX Cloud` + `ESP32 → HTTP → InfluxDB Cloud → Grafana Cloud`
 
 ### 🔔 Smart Alert System
 - **3-Color Level**: BLUE (Normal) → ORANGE (Warning) → RED (Danger)
@@ -30,9 +36,9 @@
 - **Status Bar**: Color-coded status display at screen bottom
 
 ### 💻 Architecture
-- **Modular Design**: `sensor_config`, `sensor_detect`, `alert_manager`, `ui_display`, `i2c_manager`
+- **Modular Design**: `sensor_config`, `sensor_detect`, `alert_manager`, `ui_display`, `i2c_manager`, `wifi_web`, `mqtt_cloud`, `influxdb_writer`
 - **I2C Bus Manager**: Centralized I2C bus sharing for multi-device communication
-- **FreeRTOS**: Task-based sensor reading and display updates
+- **FreeRTOS**: Task-based sensor reading, cloud upload, and display updates
 
 ---
 
@@ -171,6 +177,37 @@ The system supports multiple display modes selected automatically based on detec
 | **CO2** | <800 ppm | <1200 ppm | ≥1200 ppm |
 | **NOx** | <100 | <200 | ≥200 |
 
+### Sensor Read Interval (`main/sensor_config.h`)
+
+```c
+#define SENSOR_READ_PERIOD_MS  20000   // 20 seconds
+```
+
+### WiFi (`components/wifi_web/wifi_web.c`)
+
+```c
+#define WIFI_SSID      "your_wifi_ssid"
+#define WIFI_PASS      "your_wifi_password"
+#define WIFI_MAX_RETRY 5
+```
+
+### MQTT Cloud (`components/mqtt_cloud/mqtt_cloud.c`)
+
+```c
+#define MQTT_BROKER_URI  "mqtts://your-broker.emqxsl.cn:8883"
+#define MQTT_USERNAME    "your_username"
+#define MQTT_PASSWORD    "your_password"
+```
+
+### InfluxDB Cloud (`components/influxdb_writer/influxdb_writer.c`)
+
+```c
+#define INFLUXDB_URL    "https://your-region.cloud2.influxdata.com"
+#define INFLUXDB_ORG    "your_org"
+#define INFLUXDB_BUCKET "sensor_data"
+#define INFLUXDB_TOKEN  "your_api_token"
+```
+
 ### Display Selection (`main/blink_example_main.c`)
 
 ```c
@@ -180,13 +217,62 @@ The system supports multiple display modes selected automatically based on detec
 
 ---
 
+## ☁️ Cloud Setup Guide
+
+### Prerequisites
+- [EMQX Cloud](https://www.emqx.com/cloud) account (Free tier: 100 sessions)
+- [InfluxDB Cloud](https://cloud2.influxdata.com) account (Free tier: 30-day retention, 5GB/month)
+- [Grafana Cloud](https://grafana.com) account (Free tier: unlimited dashboards, 3 users)
+
+### Data Flow Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                      ESP32                          │
+│  ┌──────────────┐        ┌──────────────────┐       │
+│  │  mqtt_cloud   │        │ influxdb_writer   │       │
+│  │  (MQTT)       │        │ (HTTP POST)       │       │
+│  └──────┬───────┘        └────────┬─────────┘       │
+└─────────┼─────────────────────────┼─────────────────┘
+          │                         │
+          ▼                         ▼
+   ┌──────────────┐        ┌──────────────────┐
+   │  EMQX Cloud   │        │  InfluxDB Cloud   │
+   │  (消息中转)    │        │  (时序数据存储)    │
+   └──────┬───────┘        └────────┬─────────┘
+          │                         │
+          ▼                         ▼
+   ┌──────────────┐        ┌──────────────────┐
+   │  MQTTX App    │        │  Grafana Cloud    │
+   │  (实时查看)    │        │  (可视化仪表盘)    │
+   └──────────────┘        └──────────────────┘
+```
+
+### Setup Steps
+1. **EMQX Cloud**: Create a free Serverless deployment, get broker URI and credentials
+2. **InfluxDB Cloud**: Create a Bucket (`sensor_data`), generate an API Token
+3. **Grafana Cloud**: Add InfluxDB as data source, create dashboards using Flux queries
+4. **ESP32**: Update credentials in `wifi_web.c`, `mqtt_cloud.c`, `influxdb_writer.c`
+
+### Grafana Dashboard Tips
+- **XY Chart**: Sensor correlation analysis (e.g., AM2020DY PM2.5 vs SEN68 PM2.5)
+- **Stat Panels**: Real-time latest values display
+- **Thresholds**: Color-coded alert levels on charts
+- **Transformations**: Calculate deviation between two sensors
+- **Annotations**: Mark test events directly on time-series charts
+
+---
+
 ## 🗺️ Roadmap
 
 ### v1.0.0 ✅
 - LED alert, SEN66/SEN68 integration, auto-detection, TFT-LCD display, multi-sensor comparison
 
-### v1.1.0 (Planned)
-- WiFi data upload, Web configuration, OTA updates
+### v1.1.0 ✅
+- WiFi connectivity, MQTT cloud upload (EMQX Cloud), InfluxDB time-series storage, Grafana visualization dashboards
+
+### v1.2.0 (Planned)
+- OTA firmware updates, web configuration portal, sensor calibration tools
 
 ---
 
@@ -204,4 +290,4 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-**Last Updated**: 2026-09-02 | **Maintainer**: [Jefferysun7972](https://github.com/Jefferysun7972)
+**Last Updated**: 2026-09-03 | **Maintainer**: [Jefferysun7972](https://github.com/Jefferysun7972)
