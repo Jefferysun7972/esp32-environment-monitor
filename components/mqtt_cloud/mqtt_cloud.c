@@ -10,9 +10,9 @@
 
 static const char *TAG = "mqtt_cloud";
 
-#define MQTT_BROKER_URI  "mqtts://f4319339.ala.cn-hangzhou.emqxsl.cn:8883"
-#define MQTT_USERNAME    "jerrysun"
-#define MQTT_PASSWORD    "renyi1004"
+#define MQTT_BROKER_URI  "mqtts://your-broker.emqxsl.cn:8883"
+#define MQTT_USERNAME    "your_username"
+#define MQTT_PASSWORD    "your_password"
 
 static esp_mqtt_client_handle_t s_client = NULL;
 static bool s_connected = false;

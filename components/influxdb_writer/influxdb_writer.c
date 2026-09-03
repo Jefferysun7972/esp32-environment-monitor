@@ -11,10 +11,10 @@
 
 static const char *TAG = "influxdb";
 
-#define INFLUXDB_URL    "https://us-east-1-1.aws.cloud2.influxdata.com"
-#define INFLUXDB_ORG    "Fellowes"
+#define INFLUXDB_URL    "https://your-region.cloud2.influxdata.com"
+#define INFLUXDB_ORG    "your_org"
 #define INFLUXDB_BUCKET "sensor_data"
-#define INFLUXDB_TOKEN  "doR-H4EoxcxidC5AYN0NjzYQB7kJ5cusQvXe16b7j1W_tO4ouL35MlFayhPfTlnxR0djAgCwCFfgOVZSCXyzog=="
+#define INFLUXDB_TOKEN  "your_api_token"
 
 #define INFLUXDB_TASK_STACK  8192
 #define INFLUXDB_TASK_PRIO   5

@@ -12,8 +12,8 @@
 
 static const char *TAG = "wifi_web";
 
-#define WIFI_SSID      "FBM_IOT_Test"
-#define WIFI_PASS      "Fls123456"
+#define WIFI_SSID      "your_wifi_ssid"
+#define WIFI_PASS      "your_wifi_password"
 #define WIFI_MAX_RETRY 5
 
 static int s_retry_num = 0;
