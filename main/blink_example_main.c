@@ -34,6 +34,7 @@
 #include "app_config.h"
 #include "alert_manager.h"
 #include "ui_display.h"
+#include "wifi_web.h"
 
 #include <math.h>
 #include "am2020dy.h"
@@ -210,6 +211,26 @@ static bool read_and_display_am2020dy_data(void)
         ui_draw_sensor_screen(&d);
     }
 #endif
+
+    {
+        wifi_sensor_data_t wd = {
+            .am2020dy_temp = data.temperature,
+            .am2020dy_humi = data.humidity,
+            .am2020dy_pm1  = (float)data.pm1_0,
+            .am2020dy_pm25 = (float)data.pm2_5,
+            .am2020dy_pm10 = (float)data.pm10,
+            .am2020dy_tvoc = (float)data.tvoc,
+            .am2020dy_no2  = (float)data.no2,
+            .am2020dy_hcho = (float)data.hcho,
+            .sen_ready = false,
+            .alert_level = alert_get_global_level(data.temperature, data.humidity,
+                            0, (float)data.pm2_5, 0, (float)data.tvoc, 0),
+        };
+        snprintf(wd.am2020dy_name, sizeof(wd.am2020dy_name), "AM2020DY");
+        snprintf(wd.alert_msg, sizeof(wd.alert_msg), "%s",
+                 is_alert ? "PM2.5 Alert!" : "Normal");
+        wifi_web_update_data(&wd);
+    }
 
     return is_alert;
 }
@@ -392,6 +413,37 @@ static bool read_and_display_dual_data(void)
     }
 #endif
 
+    {
+        wifi_sensor_data_t wd = {
+            .am2020dy_temp = a_temp,
+            .am2020dy_humi = a_hum,
+            .am2020dy_pm1  = (float)a_data.pm1_0,
+            .am2020dy_pm25 = (float)a_data.pm2_5,
+            .am2020dy_pm10 = (float)a_data.pm10,
+            .am2020dy_tvoc = (float)a_data.tvoc,
+            .am2020dy_no2  = (float)a_data.no2,
+            .am2020dy_hcho = (float)a_data.hcho,
+            .sen_ready = s_ok,
+            .sen_temp = s_temp_f,
+            .sen_humi = s_hum_f,
+            .sen_pm1  = (float)s_pm1,
+            .sen_pm25 = (float)s_pm25,
+            .sen_pm10 = (float)s_pm10,
+            .sen_tvoc = s_tvoc_f,
+            .sen_nox  = s_nox_f,
+            .sen_co2  = (float)s_co2,
+            .sen_hcho = s_hcho_f,
+            .alert_level = alert_get_global_level(a_temp, a_hum, (float)a_data.no2,
+                            (float)a_data.pm2_5, a_data.hcho, (float)a_data.tvoc, 1),
+        };
+        snprintf(wd.am2020dy_name, sizeof(wd.am2020dy_name), "AM2020DY");
+        snprintf(wd.sen_name, sizeof(wd.sen_name), "%s",
+                 g_sen_type == 66 ? "SEN66" : "SEN68");
+        snprintf(wd.alert_msg, sizeof(wd.alert_msg), "%s",
+                 is_alert ? "Environmental Alert!" : "Normal");
+        wifi_web_update_data(&wd);
+    }
+
     return is_alert;
 }
 
@@ -447,6 +499,9 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Starting main loop - reading %s every %d ms...",
              g_sensor_name, SENSOR_READ_PERIOD_MS);
+
+    wifi_web_init();
+    ESP_LOGI(TAG, "WiFi and Web server started");
 
     while (1) {
         bool alert_active;
