@@ -94,6 +94,12 @@ Page({
     const ref = am2020.length >= sen68.length ? am2020 : sen68;
     const N = Math.max(ref.length, 1);
 
+    // Show data point counts in legend
+    this.setData({
+      am2020Count: am2020.length,
+      sen68Count: sen68.length
+    });
+
     const vals = data.map(d => d.value);
     let minV = Math.min(...vals), maxV = Math.max(...vals);
     if (minV === maxV) { minV -= 1; maxV += 1; }
@@ -143,10 +149,18 @@ Page({
       ctx.fillText(ref[N - 1].displayTime, sx(N - 1), pad.t + ph + 6 + (seq % 2 ? 14 : 0));
     }
 
-    // Draw one series (solid lines, no dash)
+    // Draw one series
     const drawSeries = (series, color) => {
-      if (series.length < 2) return;
+      if (series.length === 0) return;
       const M = series.length;
+      if (M === 1) {
+        // Single point: draw a dot
+        ctx.setFillStyle(color);
+        ctx.beginPath();
+        ctx.arc(sx(0), sy(series[0].value), 3, 0, 2 * Math.PI);
+        ctx.fill();
+        return;
+      }
       ctx.setStrokeStyle(color);
       ctx.setLineWidth(2);
       ctx.beginPath();
@@ -161,18 +175,18 @@ Page({
     drawSeries(am2020, metric.color1);
     drawSeries(sen68, metric.color2);
 
-    // Legend
+    // Legend with counts
     ctx.setFontSize(11);
     ctx.setTextAlign('left');
     ctx.setTextBaseline('top');
     ctx.setFillStyle(metric.color1);
     ctx.fillRect(pad.l, 8, 14, 10);
     ctx.setFillStyle('#333');
-    ctx.fillText('AM2020DY', pad.l + 18, 8);
+    ctx.fillText('AM2020DY(' + am2020.length + ')', pad.l + 18, 8);
     ctx.setFillStyle(metric.color2);
-    ctx.fillRect(pad.l + 100, 8, 14, 10);
+    ctx.fillRect(pad.l + 120, 8, 14, 10);
     ctx.setFillStyle('#333');
-    ctx.fillText('SEN68', pad.l + 118, 8);
+    ctx.fillText('SEN68(' + sen68.length + ')', pad.l + 138, 8);
 
     ctx.draw();
   }
