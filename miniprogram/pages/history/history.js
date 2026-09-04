@@ -24,6 +24,7 @@ Page({
     selectedRange: '1h',
     loading: false,
     chartData: null,
+    tableData: null,
     canvasWidth: 0,
     canvasHeight: 220
   },
@@ -65,7 +66,18 @@ Page({
         ...d,
         value: Math.round(d.value * 10) / 10
       }));
-      this.setData({ chartData: rounded, loading: false }, () => {
+
+      // Group by displayTime for table
+      const groupMap = {};
+      rounded.forEach(d => {
+        if (!groupMap[d.displayTime]) {
+          groupMap[d.displayTime] = { displayTime: d.displayTime };
+        }
+        groupMap[d.displayTime][d.sensor] = d.value;
+      });
+      const tableData = Object.values(groupMap);
+
+      this.setData({ chartData: rounded, tableData, loading: false }, () => {
         setTimeout(() => this.drawChart(), 200);
       });
     });

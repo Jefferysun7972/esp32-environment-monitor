@@ -39,23 +39,23 @@
     </view>
   </view>
 
-  <view class="data-table" wx:if="{{chartData && chartData.length > 0}}">
+  <view class="data-table" wx:if="{{tableData && tableData.length > 0}}">
     <view class="section-title">数据明细</view>
     <view class="table-header">
       <text class="col-time">时间</text>
-      <text class="col-sensor">传感器</text>
-      <text class="col-value">数值</text>
+      <text class="col-val">AM2020DY</text>
+      <text class="col-val">SEN68</text>
     </view>
     <scroll-view scroll-y class="table-body">
       <view
-        wx:for="{{chartData}}"
-        wx:key="_key"
+        wx:for="{{tableData}}"
+        wx:key="displayTime"
         wx:for-item="row"
         class="table-row"
       >
         <text class="col-time">{{row.displayTime}}</text>
-        <text class="col-sensor">{{row.sensor === 'am2020dy' ? 'AM2020DY' : 'SEN68'}}</text>
-        <text class="col-value">{{row.value}} {{metricUnit}}</text>
+        <text class="col-val">{{row.am2020dy !== undefined ? row.am2020dy : '--'}} {{metricUnit}}</text>
+        <text class="col-val">{{row.SEN68 !== undefined ? row.SEN68 : '--'}} {{metricUnit}}</text>
       </view>
     </scroll-view>
   </view>

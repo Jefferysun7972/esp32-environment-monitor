@@ -129,17 +129,10 @@
   color: #666;
 }
 
-.col-sensor {
-  flex: 1.5;
+.col-val {
+  flex: 1;
   font-size: 22rpx;
+  font-weight: 600;
   color: #333;
   text-align: center;
-}
-
-.col-value {
-  flex: 1;
-  font-size: 24rpx;
-  font-weight: 600;
-  color: #1a73e8;
-  text-align: right;
 }
