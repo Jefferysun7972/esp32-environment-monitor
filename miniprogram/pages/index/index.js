@@ -22,5 +22,11 @@ Page({
       sen68: app.globalData.sensorData.sen68 || {},
       connected: app.globalData.connected
     });
+  },
+
+  onRefresh() {
+    const app = getApp();
+    app.fetchData();
+    wx.showToast({ title: '刷新中', icon: 'loading', duration: 1000 });
   }
 });
