@@ -1,4 +1,4 @@
-const MQTT_BROKER = 'wss://f4319339.ala.cn-hangzhou.emqxsl.cn:8084/mqtt';
+const MQTT_BROKER = 'ws://f4319339.ala.cn-hangzhou.emqxsl.cn:8083/mqtt';
 const MQTT_USER = 'jerrysun';
 const MQTT_PASS = 'renyi1004';
 
