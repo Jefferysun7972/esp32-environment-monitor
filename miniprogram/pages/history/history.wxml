@@ -28,6 +28,7 @@
       canvas-id="historyCanvas"
       id="historyCanvas"
       class="chart-canvas"
+      style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
     ></canvas>
     <view wx:if="{{loading}}" class="overlay">
       <text class="loading">加载中...</text>

@@ -22,37 +22,27 @@ Page({
     ranges: RANGES,
     selectedMetric: 'temp',
     selectedRange: '1h',
-    metricLabel: '温度',
-    metricUnit: '°C',
     loading: false,
     chartData: null,
     canvasWidth: 0,
-    canvasHeight: 0
+    canvasHeight: 220
   },
 
   onLoad() {
     const sysInfo = wx.getSystemInfoSync();
-    this.setData({
-      canvasWidth: sysInfo.windowWidth - 48,
-      canvasHeight: 220
-    });
+    this.setData({ canvasWidth: sysInfo.windowWidth - 48 });
     this.loadData();
   },
 
   onShow() {
     if (this.data.chartData) {
-      setTimeout(() => this.drawChart(), 100);
+      this.drawChart();
     }
   },
 
   onMetricTap(e) {
     const key = e.currentTarget.dataset.key;
-    const metric = METRICS.find(m => m.key === key);
-    this.setData({
-      selectedMetric: key,
-      metricLabel: metric.label,
-      metricUnit: metric.unit
-    });
+    this.setData({ selectedMetric: key });
     this.loadData();
   },
 
@@ -75,8 +65,9 @@ Page({
         ...d,
         value: Math.round(d.value * 10) / 10
       }));
-      this.setData({ chartData: rounded });
-      setTimeout(() => this.drawChart(), 100);
+      this.setData({ chartData: rounded }, () => {
+        this.drawChart();
+      });
     });
   },
 
@@ -85,46 +76,34 @@ Page({
     if (!data || data.length === 0) return;
 
     const ctx = wx.createCanvasContext('historyCanvas', this);
-    const width = this.data.canvasWidth;
-    const height = this.data.canvasHeight;
+    const W = this.data.canvasWidth;
+    const H = this.data.canvasHeight;
+    const pad = { t: 20, r: 12, b: 38, l: 44 };
+    const pw = W - pad.l - pad.r;
+    const ph = H - pad.t - pad.b;
 
-    this.renderChart(ctx, data, width, height);
-    ctx.draw();
-  },
-
-  renderChart(ctx, data, width, height) {
-    const padding = { top: 25, right: 16, bottom: 40, left: 48 };
-    const plotW = width - padding.left - padding.right;
-    const plotH = height - padding.top - padding.bottom;
-
-    // Separate by sensor
     const am2020 = data.filter(d => d.sensor === 'am2020dy');
     const sen68 = data.filter(d => d.sensor === 'SEN68');
+    const ref = am2020.length >= sen68.length ? am2020 : sen68;
+    const N = Math.max(ref.length, 1);
 
-    // Use the larger series as reference for x-axis labels
-    const xRef = am2020.length >= sen68.length ? am2020 : sen68;
-    const total = Math.max(xRef.length, 1);
+    const vals = data.map(d => d.value);
+    let minV = Math.min(...vals), maxV = Math.max(...vals);
+    if (minV === maxV) { minV -= 1; maxV += 1; }
+    const rng = maxV - minV;
+    minV -= rng * 0.08;
+    maxV += rng * 0.08;
 
-    const allValues = data.map(d => d.value);
-    if (allValues.length === 0) return;
-    let minVal = Math.min(...allValues);
-    let maxVal = Math.max(...allValues);
-    if (minVal === maxVal) { minVal -= 1; maxVal += 1; }
-    const valRange = maxVal - minVal;
-    minVal -= valRange * 0.05;
-    maxVal += valRange * 0.05;
+    const sx = (i) => pad.l + (i / Math.max(N - 1, 1)) * pw;
+    const sy = (v) => pad.t + ph - ((v - minV) / (maxV - minV)) * ph;
 
-    const scaleX = (i) => padding.left + (i / Math.max(total - 1, 1)) * plotW;
-    const scaleY = (v) => padding.top + plotH - ((v - minVal) / (maxVal - minVal)) * plotH;
-
-    // Clear
-    ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(0, 0, W, H);
 
     // Background
     ctx.setFillStyle('#fafafa');
-    ctx.fillRect(padding.left, padding.top, plotW, plotH);
+    ctx.fillRect(pad.l, pad.t, pw, ph);
 
-    // Grid lines + Y labels
+    // Grid lines
     ctx.setStrokeStyle('#e8e8e8');
     ctx.setLineWidth(0.5);
     ctx.setFillStyle('#999');
@@ -132,79 +111,62 @@ Page({
     ctx.setTextAlign('right');
     ctx.setTextBaseline('middle');
     for (let i = 0; i <= 4; i++) {
-      const val = minVal + (maxVal - minVal) * (i / 4);
-      const y = scaleY(val);
+      const v = minV + (maxV - minV) * (i / 4);
+      const y = sy(v);
       ctx.beginPath();
-      ctx.moveTo(padding.left, y);
-      ctx.lineTo(padding.left + plotW, y);
+      ctx.moveTo(pad.l, y);
+      ctx.lineTo(pad.l + pw, y);
       ctx.stroke();
-      ctx.fillText(val.toFixed(1), padding.left - 6, y);
+      ctx.fillText(v.toFixed(1), pad.l - 6, y);
     }
 
-    // X axis labels from reference series (evenly spaced, ~5 labels)
-    const labelCount = Math.min(5, total);
-    const step = Math.max(1, Math.floor(total / labelCount));
+    // X-axis labels
+    const labelMax = Math.min(5, N);
+    const labelStep = Math.max(1, Math.floor(N / labelMax));
     ctx.setFillStyle('#999');
     ctx.setFontSize(10);
     ctx.setTextAlign('center');
     ctx.setTextBaseline('top');
-    let labelSeq = 0;
-    for (let i = 0; i < total; i += step) {
-      const x = scaleX(i);
-      const yOffset = (labelSeq % 2 === 0) ? 0 : 14;
-      ctx.fillText(xRef[i].displayTime, x, padding.top + plotH + 6 + yOffset);
-      labelSeq++;
+    let seq = 0;
+    for (let i = 0; i < N; i += labelStep) {
+      ctx.fillText(ref[i].displayTime, sx(i), pad.t + ph + 6 + (seq % 2 ? 14 : 0));
+      seq++;
     }
-    const lastIdx = total - 1;
-    if (labelCount > 1 && lastIdx % step !== 0 && lastIdx > 0) {
-      const x = scaleX(lastIdx);
-      const yOffset = (labelSeq % 2 === 0) ? 0 : 14;
-      ctx.fillText(xRef[lastIdx].displayTime, x, padding.top + plotH + 6 + yOffset);
+    if (labelMax > 1 && (N - 1) % labelStep !== 0 && N > 1) {
+      ctx.fillText(ref[N - 1].displayTime, sx(N - 1), pad.t + ph + 6 + (seq % 2 ? 14 : 0));
     }
 
-    const drawSeries = (series, color, dash) => {
+    // Draw one series (solid lines, no dash)
+    const drawSeries = (series, color) => {
       if (series.length < 2) return;
+      const M = series.length;
       ctx.setStrokeStyle(color);
       ctx.setLineWidth(2);
-      if (dash) ctx.setLineDash([6, 4], 0);
-      else ctx.setLineDash([], 0);
       ctx.beginPath();
-      ctx.moveTo(scaleX(0), scaleY(series[0].value));
-      for (let i = 1; i < series.length; i++) {
-        const xi = scaleX(i * (total - 1) / Math.max(series.length - 1, 1));
-        ctx.lineTo(xi, scaleY(series[i].value));
+      ctx.moveTo(sx(0), sy(series[0].value));
+      for (let i = 1; i < M; i++) {
+        ctx.lineTo(sx(i * (N - 1) / (M - 1)), sy(series[i].value));
       }
       ctx.stroke();
-      ctx.setLineDash([], 0);
-
-      series.forEach((d, i) => {
-        const xi = scaleX(i * (total - 1) / Math.max(series.length - 1, 1));
-        ctx.setFillStyle(color);
-        ctx.beginPath();
-        ctx.arc(xi, scaleY(d.value), 2.5, 0, 2 * Math.PI);
-        ctx.fill();
-      });
     };
 
     const metric = METRICS.find(m => m.key === this.data.selectedMetric);
-
-    drawSeries(am2020, metric.color1, false);
-    drawSeries(sen68, metric.color2, true);
+    drawSeries(am2020, metric.color1);
+    drawSeries(sen68, metric.color2);
 
     // Legend
-    const legY = 10;
     ctx.setFontSize(11);
     ctx.setTextAlign('left');
     ctx.setTextBaseline('top');
-
     ctx.setFillStyle(metric.color1);
-    ctx.fillRect(padding.left, legY, 14, 10);
+    ctx.fillRect(pad.l, 8, 14, 10);
     ctx.setFillStyle('#333');
-    ctx.fillText('AM2020DY', padding.left + 18, legY);
-
+    ctx.fillText('AM2020DY', pad.l + 18, 8);
     ctx.setFillStyle(metric.color2);
-    ctx.fillRect(padding.left + 100, legY, 14, 10);
+    ctx.fillRect(pad.l + 100, 8, 14, 10);
     ctx.setFillStyle('#333');
-    ctx.fillText('SEN68', padding.left + 118, legY);
+    ctx.fillText('SEN68', pad.l + 118, 8);
+
+    ctx.draw();
   }
 });
