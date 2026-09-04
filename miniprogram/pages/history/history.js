@@ -92,8 +92,12 @@ Page({
     const plotH = height - padding.top - padding.bottom;
 
     // Separate by sensor
-    const am2020Data = data.filter(d => d.sensor === 'am2020dy');
-    const sen68Data = data.filter(d => d.sensor === 'SEN68');
+    const am2020 = data.filter(d => d.sensor === 'am2020dy');
+    const sen68 = data.filter(d => d.sensor === 'SEN68');
+
+    // Use the larger series length as unified X axis, labels from am2020
+    const xRef = am2020.length >= sen68.length ? am2020 : sen68;
+    const total = xRef.length;
 
     const allValues = data.map(d => d.value);
     let minVal = Math.min(...allValues);
@@ -103,7 +107,7 @@ Page({
     minVal -= valRange * 0.05;
     maxVal += valRange * 0.05;
 
-    const scaleX = (i, total) => padding.left + (i / Math.max(total - 1, 1)) * plotW;
+    const scaleX = (i) => padding.left + (i / Math.max(total - 1, 1)) * plotW;
     const scaleY = (v) => padding.top + plotH - ((v - minVal) / (maxVal - minVal)) * plotH;
 
     // Background
@@ -127,52 +131,45 @@ Page({
       ctx.fillText(val.toFixed(1), padding.left - 6, y);
     }
 
-    // X axis labels - pick ~5 evenly spaced
-    const labelCount = Math.min(5, data.length);
-    const step = Math.max(1, Math.floor(data.length / labelCount));
-    const labelIndices = [];
-    for (let i = 0; i < data.length; i += step) {
-      labelIndices.push(i);
-    }
-    if (labelIndices[labelIndices.length - 1] !== data.length - 1) {
-      labelIndices.push(data.length - 1);
-    }
-
+    // X axis labels from reference series, evenly spaced
+    const labelCount = Math.min(5, total);
+    const step = Math.max(1, Math.floor(total / labelCount));
     ctx.setFillStyle('#999');
     ctx.setFontSize(10);
     ctx.setTextAlign('center');
     ctx.setTextBaseline('top');
-    labelIndices.forEach((idx, i) => {
-      const d = data[idx];
-      const x = scaleX(idx, data.length);
-      // Stagger: even indices on first line, odd on second
-      const yOffset = (i % 2 === 0) ? 0 : 14;
-      ctx.fillText(d.displayTime, x, padding.top + plotH + 6 + yOffset);
-    });
+    let labelSeq = 0;
+    for (let i = 0; i < total; i += step) {
+      const x = scaleX(i);
+      const yOffset = (labelSeq % 2 === 0) ? 0 : 14;
+      ctx.fillText(xRef[i].displayTime, x, padding.top + plotH + 6 + yOffset);
+      labelSeq++;
+    }
+    // Always show last label
+    if (labelCount > 1 && (total - 1) % step !== 0) {
+      const x = scaleX(total - 1);
+      const yOffset = (labelSeq % 2 === 0) ? 0 : 14;
+      ctx.fillText(xRef[total - 1].displayTime, x, padding.top + plotH + 6 + yOffset);
+    }
 
-    // Draw lines
-    const drawLine = (series, color, dash) => {
+    // Draw a series line using its own index
+    const drawSeries = (series, color, dash) => {
       if (series.length < 2) return;
       ctx.setStrokeStyle(color);
       ctx.setLineWidth(2);
       if (dash) ctx.setLineDash([6, 4], 0);
       else ctx.setLineDash([], 0);
       ctx.beginPath();
-      const firstIdx = data.indexOf(series[0]);
-      ctx.moveTo(scaleX(firstIdx, data.length), scaleY(series[0].value));
+      ctx.moveTo(scaleX(0), scaleY(series[0].value));
       for (let i = 1; i < series.length; i++) {
-        const idx = data.indexOf(series[i]);
-        ctx.lineTo(scaleX(idx, data.length), scaleY(series[i].value));
+        ctx.lineTo(scaleX(i * (total - 1) / Math.max(series.length - 1, 1)), scaleY(series[i].value));
       }
       ctx.stroke();
       ctx.setLineDash([], 0);
-    };
 
-    // Draw points
-    const drawPoints = (series, color) => {
-      series.forEach(d => {
-        const idx = data.indexOf(d);
-        const x = scaleX(idx, data.length);
+      // Points
+      series.forEach((d, i) => {
+        const x = scaleX(i * (total - 1) / Math.max(series.length - 1, 1));
         const y = scaleY(d.value);
         ctx.setFillStyle(color);
         ctx.beginPath();
@@ -183,10 +180,8 @@ Page({
 
     const metric = METRICS.find(m => m.key === this.data.selectedMetric);
 
-    drawLine(am2020Data, metric.color1, false);
-    drawPoints(am2020Data, metric.color1);
-    drawLine(sen68Data, metric.color2, true);
-    drawPoints(sen68Data, metric.color2);
+    drawSeries(am2020, metric.color1, false);
+    drawSeries(sen68, metric.color2, true);
 
     // Legend
     const legY = 10;
