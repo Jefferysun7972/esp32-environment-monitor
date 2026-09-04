@@ -25,7 +25,7 @@
 
   <view class="chart-container">
     <canvas
-      type="2d"
+      canvas-id="historyCanvas"
       id="historyCanvas"
       class="chart-canvas"
     ></canvas>

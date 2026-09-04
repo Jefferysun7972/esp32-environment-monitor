@@ -84,22 +84,12 @@ Page({
     const data = this.data.chartData;
     if (!data || data.length === 0) return;
 
-    const query = wx.createSelectorQuery();
-    query.select('#historyCanvas')
-      .fields({ node: true, size: true })
-      .exec((res) => {
-        if (!res[0] || !res[0].node) return;
-        const canvas = res[0].node;
-        const ctx = canvas.getContext('2d');
-        const dpr = wx.getSystemInfoSync().pixelRatio;
-        const width = res[0].width;
-        const height = res[0].height;
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
-        ctx.scale(dpr, dpr);
+    const ctx = wx.createCanvasContext('historyCanvas', this);
+    const width = this.data.canvasWidth;
+    const height = this.data.canvasHeight;
 
-        this.renderChart(ctx, data, width, height);
-      });
+    this.renderChart(ctx, data, width, height);
+    ctx.draw();
   },
 
   renderChart(ctx, data, width, height) {
@@ -131,16 +121,16 @@ Page({
     ctx.clearRect(0, 0, width, height);
 
     // Background
-    ctx.fillStyle = '#fafafa';
+    ctx.setFillStyle('#fafafa');
     ctx.fillRect(padding.left, padding.top, plotW, plotH);
 
     // Grid lines + Y labels
-    ctx.strokeStyle = '#e8e8e8';
-    ctx.lineWidth = 0.5;
-    ctx.fillStyle = '#999';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
+    ctx.setStrokeStyle('#e8e8e8');
+    ctx.setLineWidth(0.5);
+    ctx.setFillStyle('#999');
+    ctx.setFontSize(10);
+    ctx.setTextAlign('right');
+    ctx.setTextBaseline('middle');
     for (let i = 0; i <= 4; i++) {
       const val = minVal + (maxVal - minVal) * (i / 4);
       const y = scaleY(val);
@@ -154,10 +144,10 @@ Page({
     // X axis labels from reference series (evenly spaced, ~5 labels)
     const labelCount = Math.min(5, total);
     const step = Math.max(1, Math.floor(total / labelCount));
-    ctx.fillStyle = '#999';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.setFillStyle('#999');
+    ctx.setFontSize(10);
+    ctx.setTextAlign('center');
+    ctx.setTextBaseline('top');
     let labelSeq = 0;
     for (let i = 0; i < total; i += step) {
       const x = scaleX(i);
@@ -165,7 +155,6 @@ Page({
       ctx.fillText(xRef[i].displayTime, x, padding.top + plotH + 6 + yOffset);
       labelSeq++;
     }
-    // Always show last label
     const lastIdx = total - 1;
     if (labelCount > 1 && lastIdx % step !== 0 && lastIdx > 0) {
       const x = scaleX(lastIdx);
@@ -173,12 +162,12 @@ Page({
       ctx.fillText(xRef[lastIdx].displayTime, x, padding.top + plotH + 6 + yOffset);
     }
 
-    // Draw a series
     const drawSeries = (series, color, dash) => {
       if (series.length < 2) return;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      ctx.setLineDash(dash ? [6, 4] : []);
+      ctx.setStrokeStyle(color);
+      ctx.setLineWidth(2);
+      if (dash) ctx.setLineDash([6, 4], 0);
+      else ctx.setLineDash([], 0);
       ctx.beginPath();
       ctx.moveTo(scaleX(0), scaleY(series[0].value));
       for (let i = 1; i < series.length; i++) {
@@ -186,12 +175,11 @@ Page({
         ctx.lineTo(xi, scaleY(series[i].value));
       }
       ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.setLineDash([], 0);
 
-      // Points
       series.forEach((d, i) => {
         const xi = scaleX(i * (total - 1) / Math.max(series.length - 1, 1));
-        ctx.fillStyle = color;
+        ctx.setFillStyle(color);
         ctx.beginPath();
         ctx.arc(xi, scaleY(d.value), 2.5, 0, 2 * Math.PI);
         ctx.fill();
@@ -205,18 +193,18 @@ Page({
 
     // Legend
     const legY = 10;
-    ctx.font = '11px sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
+    ctx.setFontSize(11);
+    ctx.setTextAlign('left');
+    ctx.setTextBaseline('top');
 
-    ctx.fillStyle = metric.color1;
+    ctx.setFillStyle(metric.color1);
     ctx.fillRect(padding.left, legY, 14, 10);
-    ctx.fillStyle = '#333';
+    ctx.setFillStyle('#333');
     ctx.fillText('AM2020DY', padding.left + 18, legY);
 
-    ctx.fillStyle = metric.color2;
+    ctx.setFillStyle(metric.color2);
     ctx.fillRect(padding.left + 100, legY, 14, 10);
-    ctx.fillStyle = '#333';
+    ctx.setFillStyle('#333');
     ctx.fillText('SEN68', padding.left + 118, legY);
   }
 });
