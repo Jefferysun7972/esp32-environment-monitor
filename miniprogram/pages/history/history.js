@@ -84,9 +84,29 @@ Page({
     const data = this.data.chartData;
     if (!data || data.length === 0) return;
 
-    const ctx = wx.createCanvasContext('historyCanvas', this);
-    const width = this.data.canvasWidth;
-    const height = this.data.canvasHeight;
+    const query = wx.createSelectorQuery();
+    query.select('#historyCanvas')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        if (!res[0] || !res[0].node) {
+          // Retry once after layout
+          setTimeout(() => this.drawChart(), 200);
+          return;
+        }
+        const canvas = res[0].node;
+        const ctx = canvas.getContext('2d');
+        const dpr = wx.getSystemInfoSync().pixelRatio;
+        const width = res[0].width;
+        const height = res[0].height;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.scale(dpr, dpr);
+
+        this.renderChart(ctx, data, width, height);
+      });
+  },
+
+  renderChart(ctx, data, width, height) {
     const padding = { top: 25, right: 16, bottom: 40, left: 48 };
     const plotW = width - padding.left - padding.right;
     const plotH = height - padding.top - padding.bottom;
@@ -95,11 +115,12 @@ Page({
     const am2020 = data.filter(d => d.sensor === 'am2020dy');
     const sen68 = data.filter(d => d.sensor === 'SEN68');
 
-    // Use the larger series length as unified X axis, labels from am2020
+    // Use the larger series as reference for x-axis labels
     const xRef = am2020.length >= sen68.length ? am2020 : sen68;
-    const total = xRef.length;
+    const total = Math.max(xRef.length, 1);
 
     const allValues = data.map(d => d.value);
+    if (allValues.length === 0) return;
     let minVal = Math.min(...allValues);
     let maxVal = Math.max(...allValues);
     if (minVal === maxVal) { minVal -= 1; maxVal += 1; }
@@ -110,17 +131,20 @@ Page({
     const scaleX = (i) => padding.left + (i / Math.max(total - 1, 1)) * plotW;
     const scaleY = (v) => padding.top + plotH - ((v - minVal) / (maxVal - minVal)) * plotH;
 
+    // Clear
+    ctx.clearRect(0, 0, width, height);
+
     // Background
-    ctx.setFillStyle('#fafafa');
+    ctx.fillStyle = '#fafafa';
     ctx.fillRect(padding.left, padding.top, plotW, plotH);
 
     // Grid lines + Y labels
-    ctx.setStrokeStyle('#e8e8e8');
-    ctx.setLineWidth(0.5);
-    ctx.setFillStyle('#999');
-    ctx.setFontSize(10);
-    ctx.setTextAlign('right');
-    ctx.setTextBaseline('middle');
+    ctx.strokeStyle = '#e8e8e8';
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = '#999';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
     for (let i = 0; i <= 4; i++) {
       const val = minVal + (maxVal - minVal) * (i / 4);
       const y = scaleY(val);
@@ -131,13 +155,13 @@ Page({
       ctx.fillText(val.toFixed(1), padding.left - 6, y);
     }
 
-    // X axis labels from reference series, evenly spaced
+    // X axis labels from reference series (evenly spaced, ~5 labels)
     const labelCount = Math.min(5, total);
     const step = Math.max(1, Math.floor(total / labelCount));
-    ctx.setFillStyle('#999');
-    ctx.setFontSize(10);
-    ctx.setTextAlign('center');
-    ctx.setTextBaseline('top');
+    ctx.fillStyle = '#999';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
     let labelSeq = 0;
     for (let i = 0; i < total; i += step) {
       const x = scaleX(i);
@@ -146,34 +170,34 @@ Page({
       labelSeq++;
     }
     // Always show last label
-    if (labelCount > 1 && (total - 1) % step !== 0) {
-      const x = scaleX(total - 1);
+    const lastIdx = total - 1;
+    if (labelCount > 1 && lastIdx % step !== 0 && lastIdx > 0) {
+      const x = scaleX(lastIdx);
       const yOffset = (labelSeq % 2 === 0) ? 0 : 14;
-      ctx.fillText(xRef[total - 1].displayTime, x, padding.top + plotH + 6 + yOffset);
+      ctx.fillText(xRef[lastIdx].displayTime, x, padding.top + plotH + 6 + yOffset);
     }
 
-    // Draw a series line using its own index
+    // Draw a series
     const drawSeries = (series, color, dash) => {
       if (series.length < 2) return;
-      ctx.setStrokeStyle(color);
-      ctx.setLineWidth(2);
-      if (dash) ctx.setLineDash([6, 4], 0);
-      else ctx.setLineDash([], 0);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(dash ? [6, 4] : []);
       ctx.beginPath();
       ctx.moveTo(scaleX(0), scaleY(series[0].value));
       for (let i = 1; i < series.length; i++) {
-        ctx.lineTo(scaleX(i * (total - 1) / Math.max(series.length - 1, 1)), scaleY(series[i].value));
+        const xi = scaleX(i * (total - 1) / Math.max(series.length - 1, 1));
+        ctx.lineTo(xi, scaleY(series[i].value));
       }
       ctx.stroke();
-      ctx.setLineDash([], 0);
+      ctx.setLineDash([]);
 
       // Points
       series.forEach((d, i) => {
-        const x = scaleX(i * (total - 1) / Math.max(series.length - 1, 1));
-        const y = scaleY(d.value);
-        ctx.setFillStyle(color);
+        const xi = scaleX(i * (total - 1) / Math.max(series.length - 1, 1));
+        ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.arc(x, y, 2.5, 0, 2 * Math.PI);
+        ctx.arc(xi, scaleY(d.value), 2.5, 0, 2 * Math.PI);
         ctx.fill();
       });
     };
@@ -185,20 +209,18 @@ Page({
 
     // Legend
     const legY = 10;
-    ctx.setFontSize(11);
-    ctx.setTextAlign('left');
-    ctx.setTextBaseline('top');
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
 
-    ctx.setFillStyle(metric.color1);
+    ctx.fillStyle = metric.color1;
     ctx.fillRect(padding.left, legY, 14, 10);
-    ctx.setFillStyle('#333');
+    ctx.fillStyle = '#333';
     ctx.fillText('AM2020DY', padding.left + 18, legY);
 
-    ctx.setFillStyle(metric.color2);
+    ctx.fillStyle = metric.color2;
     ctx.fillRect(padding.left + 100, legY, 14, 10);
-    ctx.setFillStyle('#333');
+    ctx.fillStyle = '#333';
     ctx.fillText('SEN68', padding.left + 118, legY);
-
-    ctx.draw();
   }
 });
