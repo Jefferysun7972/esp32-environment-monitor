@@ -40,11 +40,16 @@
     "disableUseStrict": false,
     "minifyWXML": true,
     "showES6CompileOption": false,
-    "useCompilerPlugins": false
+    "useCompilerPlugins": false,
+    "compileWorklet": false,
+    "localPlugins": false,
+    "condition": false
   },
   "compileType": "miniprogram",
   "libVersion": "3.6.0",
   "appid": "wxa32bc7f2c490cf71",
   "projectname": "env-monitor",
-  "condition": {}
+  "condition": {},
+  "simulatorPluginLibVersion": {},
+  "editorSetting": {}
 }
