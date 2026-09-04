@@ -32,14 +32,16 @@ Page({
 
   onLoad() {
     const sysInfo = wx.getSystemInfoSync();
-    const width = sysInfo.windowWidth - 48;
-    this.setData({ canvasWidth: width, canvasHeight: 220 });
+    this.setData({
+      canvasWidth: sysInfo.windowWidth - 48,
+      canvasHeight: 220
+    });
     this.loadData();
   },
 
   onShow() {
     if (this.data.chartData) {
-      this.drawChart();
+      setTimeout(() => this.drawChart(), 300);
     }
   },
 
@@ -69,8 +71,12 @@ Page({
         wx.showToast({ title: err, icon: 'none' });
         return;
       }
-      this.setData({ chartData: data });
-      this.drawChart();
+      const rounded = (data || []).map(d => ({
+        ...d,
+        value: Math.round(d.value * 10) / 10
+      }));
+      this.setData({ chartData: rounded });
+      setTimeout(() => this.drawChart(), 300);
     });
   },
 
@@ -78,59 +84,39 @@ Page({
     const data = this.data.chartData;
     if (!data || data.length === 0) return;
 
-    const query = wx.createSelectorQuery();
-    query.select('#historyCanvas')
-      .fields({ node: true, size: true })
-      .exec((res) => {
-        if (!res[0] || !res[0].node) return;
-        const canvas = res[0].node;
-        const ctx = canvas.getContext('2d');
-        const width = this.data.canvasWidth;
-        const height = this.data.canvasHeight;
-
-        const dpr = wx.getSystemInfoSync().pixelRatio;
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
-        ctx.scale(dpr, dpr);
-
-        this.renderChart(ctx, data, width, height);
-      });
-  },
-
-  renderChart(ctx, data, width, height) {
-    const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+    const ctx = wx.createCanvasContext('historyCanvas', this);
+    const width = this.data.canvasWidth;
+    const height = this.data.canvasHeight;
+    const padding = { top: 25, right: 16, bottom: 40, left: 48 };
     const plotW = width - padding.left - padding.right;
     const plotH = height - padding.top - padding.bottom;
 
-    // Separate data by sensor
+    // Separate by sensor
     const am2020Data = data.filter(d => d.sensor === 'am2020dy');
     const sen68Data = data.filter(d => d.sensor === 'SEN68');
 
-    // Find min/max across all data
-    let allValues = data.map(d => d.value);
+    const allValues = data.map(d => d.value);
     let minVal = Math.min(...allValues);
     let maxVal = Math.max(...allValues);
     if (minVal === maxVal) { minVal -= 1; maxVal += 1; }
-    const range = maxVal - minVal;
-    minVal -= range * 0.05;
-    maxVal += range * 0.05;
+    const valRange = maxVal - minVal;
+    minVal -= valRange * 0.05;
+    maxVal += valRange * 0.05;
 
-    const scaleX = (i, total) => padding.left + (i / (total - 1)) * plotW;
+    const scaleX = (i, total) => padding.left + (i / Math.max(total - 1, 1)) * plotW;
     const scaleY = (v) => padding.top + plotH - ((v - minVal) / (maxVal - minVal)) * plotH;
 
-    // Clear
-    ctx.clearRect(0, 0, width, height);
-
     // Background
-    ctx.fillStyle = '#fafafa';
+    ctx.setFillStyle('#fafafa');
     ctx.fillRect(padding.left, padding.top, plotW, plotH);
 
     // Grid lines + Y labels
-    ctx.strokeStyle = '#e8e8e8';
-    ctx.lineWidth = 0.5;
-    ctx.fillStyle = '#999';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right';
+    ctx.setStrokeStyle('#e8e8e8');
+    ctx.setLineWidth(0.5);
+    ctx.setFillStyle('#999');
+    ctx.setFontSize(10);
+    ctx.setTextAlign('right');
+    ctx.setTextBaseline('middle');
     for (let i = 0; i <= 4; i++) {
       const val = minVal + (maxVal - minVal) * (i / 4);
       const y = scaleY(val);
@@ -138,29 +124,39 @@ Page({
       ctx.moveTo(padding.left, y);
       ctx.lineTo(padding.left + plotW, y);
       ctx.stroke();
-      ctx.fillText(val.toFixed(1), padding.left - 6, y + 4);
+      ctx.fillText(val.toFixed(1), padding.left - 6, y);
     }
 
-    // X axis labels
-    ctx.fillStyle = '#999';
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'center';
-    const xLabels = this.getXLabels(data, 5);
-    xLabels.forEach(l => {
-      const idx = data.findIndex(d => d.displayTime === l.label);
-      if (idx >= 0) {
-        const x = scaleX(idx, data.length);
-        ctx.fillText(l.label, x, padding.top + plotH + 18);
-      }
+    // X axis labels - pick ~5 evenly spaced
+    const labelCount = Math.min(5, data.length);
+    const step = Math.max(1, Math.floor(data.length / labelCount));
+    const labelIndices = [];
+    for (let i = 0; i < data.length; i += step) {
+      labelIndices.push(i);
+    }
+    if (labelIndices[labelIndices.length - 1] !== data.length - 1) {
+      labelIndices.push(data.length - 1);
+    }
+
+    ctx.setFillStyle('#999');
+    ctx.setFontSize(10);
+    ctx.setTextAlign('center');
+    ctx.setTextBaseline('top');
+    labelIndices.forEach((idx, i) => {
+      const d = data[idx];
+      const x = scaleX(idx, data.length);
+      // Stagger: even indices on first line, odd on second
+      const yOffset = (i % 2 === 0) ? 0 : 14;
+      ctx.fillText(d.displayTime, x, padding.top + plotH + 6 + yOffset);
     });
 
     // Draw lines
     const drawLine = (series, color, dash) => {
       if (series.length < 2) return;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 2;
-      if (dash) ctx.setLineDash([4, 3]);
-      else ctx.setLineDash([]);
+      ctx.setStrokeStyle(color);
+      ctx.setLineWidth(2);
+      if (dash) ctx.setLineDash([6, 4], 0);
+      else ctx.setLineDash([], 0);
       ctx.beginPath();
       const firstIdx = data.indexOf(series[0]);
       ctx.moveTo(scaleX(firstIdx, data.length), scaleY(series[0].value));
@@ -169,18 +165,18 @@ Page({
         ctx.lineTo(scaleX(idx, data.length), scaleY(series[i].value));
       }
       ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.setLineDash([], 0);
     };
 
     // Draw points
     const drawPoints = (series, color) => {
-      series.forEach((d, i) => {
+      series.forEach(d => {
         const idx = data.indexOf(d);
         const x = scaleX(idx, data.length);
         const y = scaleY(d.value);
-        ctx.fillStyle = color;
+        ctx.setFillStyle(color);
         ctx.beginPath();
-        ctx.arc(x, y, 3, 0, 2 * Math.PI);
+        ctx.arc(x, y, 2.5, 0, 2 * Math.PI);
         ctx.fill();
       });
     };
@@ -193,33 +189,21 @@ Page({
     drawPoints(sen68Data, metric.color2);
 
     // Legend
-    const legendY = 10;
-    ctx.font = '11px sans-serif';
+    const legY = 10;
+    ctx.setFontSize(11);
+    ctx.setTextAlign('left');
+    ctx.setTextBaseline('top');
 
-    ctx.fillStyle = metric.color1;
-    ctx.fillRect(padding.left, legendY, 14, 10);
-    ctx.fillStyle = '#333';
-    ctx.textAlign = 'left';
-    ctx.fillText('AM2020DY', padding.left + 18, legendY + 9);
+    ctx.setFillStyle(metric.color1);
+    ctx.fillRect(padding.left, legY, 14, 10);
+    ctx.setFillStyle('#333');
+    ctx.fillText('AM2020DY', padding.left + 18, legY);
 
-    ctx.fillStyle = metric.color2;
-    ctx.fillRect(padding.left + 90, legendY, 14, 10);
-    ctx.fillStyle = '#333';
-    ctx.fillText('SEN68', padding.left + 108, legendY + 9);
-  },
+    ctx.setFillStyle(metric.color2);
+    ctx.fillRect(padding.left + 100, legY, 14, 10);
+    ctx.setFillStyle('#333');
+    ctx.fillText('SEN68', padding.left + 118, legY);
 
-  getXLabels(data, count) {
-    if (data.length <= count) {
-      return data.map(d => ({ label: d.displayTime }));
-    }
-    const step = Math.floor(data.length / (count - 1));
-    const labels = [];
-    for (let i = 0; i < data.length; i += step) {
-      labels.push({ label: data[i].displayTime });
-    }
-    if (labels.length < count) {
-      labels.push({ label: data[data.length - 1].displayTime });
-    }
-    return labels.slice(0, count);
+    ctx.draw();
   }
 });

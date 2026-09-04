@@ -31,7 +31,7 @@
     </view>
     <canvas
       wx:else
-      type="2d"
+      canvas-id="historyCanvas"
       id="historyCanvas"
       class="chart-canvas"
       style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"

@@ -164,9 +164,18 @@ App({
       let displayTime = timeStr;
       try {
         const d = new Date(timeStr);
-        displayTime = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
-          String(d.getHours()).padStart(2, '0') + ':' +
-          String(d.getMinutes()).padStart(2, '0');
+        const now = new Date();
+        const isToday = d.getFullYear() === now.getFullYear() &&
+          d.getMonth() === now.getMonth() &&
+          d.getDate() === now.getDate();
+        if (isToday) {
+          displayTime = String(d.getHours()).padStart(2, '0') + ':' +
+            String(d.getMinutes()).padStart(2, '0');
+        } else {
+          displayTime = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+            String(d.getHours()).padStart(2, '0') + ':' +
+            String(d.getMinutes()).padStart(2, '0');
+        }
       } catch (e) {}
 
       result.push({
