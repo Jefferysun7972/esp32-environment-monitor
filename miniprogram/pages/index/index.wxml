@@ -1,0 +1,95 @@
+<view class="container">
+  <view class="header">
+    <text class="header-title">环境监测</text>
+    <view class="status-bar">
+      <text class="status {{connected ? 'online' : 'offline'}}">
+        {{connected ? '已连接' : '未连接'}}
+      </text>
+      <text class="update-time" wx:if="{{lastUpdate}}">更新: {{lastUpdate}}</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="card-title">AM2020DY</text>
+    <view class="row">
+      <view class="item">
+        <text class="label">温度</text>
+        <text class="value">{{am2020dy.temp || '--'}}°C</text>
+      </view>
+      <view class="item">
+        <text class="label">湿度</text>
+        <text class="value">{{am2020dy.humi || '--'}}%</text>
+      </view>
+    </view>
+    <view class="row">
+      <view class="item">
+        <text class="label">PM1.0</text>
+        <text class="value">{{am2020dy.pm1 || '--'}}</text>
+      </view>
+      <view class="item">
+        <text class="label">PM2.5</text>
+        <text class="value">{{am2020dy.pm25 || '--'}}</text>
+      </view>
+      <view class="item">
+        <text class="label">PM10</text>
+        <text class="value">{{am2020dy.pm10 || '--'}}</text>
+      </view>
+    </view>
+    <view class="row">
+      <view class="item">
+        <text class="label">TVOC</text>
+        <text class="value">{{am2020dy.tvoc || '--'}}</text>
+      </view>
+      <view class="item">
+        <text class="label">NO2</text>
+        <text class="value">{{am2020dy.no2 || '--'}}</text>
+      </view>
+      <view class="item">
+        <text class="label">HCHO</text>
+        <text class="value">{{am2020dy.hcho || '--'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <text class="card-title">SEN68</text>
+    <view class="row">
+      <view class="item">
+        <text class="label">温度</text>
+        <text class="value">{{sen68.temp || '--'}}°C</text>
+      </view>
+      <view class="item">
+        <text class="label">湿度</text>
+        <text class="value">{{sen68.humi || '--'}}%</text>
+      </view>
+    </view>
+    <view class="row">
+      <view class="item">
+        <text class="label">PM1.0</text>
+        <text class="value">{{sen68.pm1 || '--'}}</text>
+      </view>
+      <view class="item">
+        <text class="label">PM2.5</text>
+        <text class="value">{{sen68.pm25 || '--'}}</text>
+      </view>
+      <view class="item">
+        <text class="label">PM10</text>
+        <text class="value">{{sen68.pm10 || '--'}}</text>
+      </view>
+    </view>
+    <view class="row">
+      <view class="item">
+        <text class="label">TVOC</text>
+        <text class="value">{{sen68.tvoc || '--'}}</text>
+      </view>
+      <view class="item">
+        <text class="label">NOx</text>
+        <text class="value">{{sen68.nox || '--'}}</text>
+      </view>
+      <view class="item">
+        <text class="label">HCHO</text>
+        <text class="value">{{sen68.hcho || '--'}}</text>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,8 @@
+{
+  "name": "env-monitor-miniprogram",
+  "version": "1.0.0",
+  "description": "ESP32 Environment Monitor - WeChat Mini Program",
+  "dependencies": {
+    "mqtt": "^5.10.0"
+  }
+}
