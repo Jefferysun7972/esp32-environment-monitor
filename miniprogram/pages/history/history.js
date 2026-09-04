@@ -66,25 +66,40 @@ Page({
         value: Math.round(d.value * 10) / 10
       }));
       this.setData({ chartData: rounded, loading: false }, () => {
-        setTimeout(() => this.drawChart(), 300);
+        setTimeout(() => this.drawChart(), 200);
       });
     });
   },
 
-  drawChart(retryCount) {
-    retryCount = retryCount || 0;
+  drawChart() {
     const data = this.data.chartData;
     if (!data || data.length === 0) return;
 
-    const ctx = wx.createCanvasContext('historyCanvas', this);
-    if (!ctx) {
-      if (retryCount < 3) {
-        setTimeout(() => this.drawChart(retryCount + 1), 300);
-      }
-      return;
-    }
-    const W = this.data.canvasWidth;
-    const H = this.data.canvasHeight;
+    const query = wx.createSelectorQuery().in(this);
+    query.select('#historyCanvas')
+      .fields({ node: true, size: true })
+      .exec((res) => {
+        if (!res || !res[0] || !res[0].node) {
+          // Retry once
+          setTimeout(() => this.drawChart(), 300);
+          return;
+        }
+        const canvas = res[0].node;
+        const W = this.data.canvasWidth;
+        const H = this.data.canvasHeight;
+        const dpr = wx.getSystemInfoSync().pixelRatio;
+
+        canvas.width = W * dpr;
+        canvas.height = H * dpr;
+
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+
+        this.renderChart(ctx, data, W, H);
+      });
+  },
+
+  renderChart(ctx, data, W, H) {
     const pad = { t: 20, r: 12, b: 38, l: 44 };
     const pw = W - pad.l - pad.r;
     const ph = H - pad.t - pad.b;
@@ -113,16 +128,16 @@ Page({
     ctx.clearRect(0, 0, W, H);
 
     // Background
-    ctx.setFillStyle('#fafafa');
+    ctx.fillStyle = '#fafafa';
     ctx.fillRect(pad.l, pad.t, pw, ph);
 
     // Grid lines
-    ctx.setStrokeStyle('#e8e8e8');
-    ctx.setLineWidth(0.5);
-    ctx.setFillStyle('#999');
-    ctx.setFontSize(10);
-    ctx.setTextAlign('right');
-    ctx.setTextBaseline('middle');
+    ctx.strokeStyle = '#e8e8e8';
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = '#999';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
     for (let i = 0; i <= 4; i++) {
       const v = minV + (maxV - minV) * (i / 4);
       const y = sy(v);
@@ -136,10 +151,10 @@ Page({
     // X-axis labels
     const labelMax = Math.min(5, N);
     const labelStep = Math.max(1, Math.floor(N / labelMax));
-    ctx.setFillStyle('#999');
-    ctx.setFontSize(10);
-    ctx.setTextAlign('center');
-    ctx.setTextBaseline('top');
+    ctx.fillStyle = '#999';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
     let seq = 0;
     for (let i = 0; i < N; i += labelStep) {
       ctx.fillText(ref[i].displayTime, sx(i), pad.t + ph + 6 + (seq % 2 ? 14 : 0));
@@ -154,15 +169,14 @@ Page({
       if (series.length === 0) return;
       const M = series.length;
       if (M === 1) {
-        // Single point: draw a dot
-        ctx.setFillStyle(color);
+        ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(sx(0), sy(series[0].value), 3, 0, 2 * Math.PI);
         ctx.fill();
         return;
       }
-      ctx.setStrokeStyle(color);
-      ctx.setLineWidth(2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(sx(0), sy(series[0].value));
       for (let i = 1; i < M; i++) {
@@ -176,18 +190,16 @@ Page({
     drawSeries(sen68, metric.color2);
 
     // Legend with counts
-    ctx.setFontSize(11);
-    ctx.setTextAlign('left');
-    ctx.setTextBaseline('top');
-    ctx.setFillStyle(metric.color1);
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = metric.color1;
     ctx.fillRect(pad.l, 8, 14, 10);
-    ctx.setFillStyle('#333');
+    ctx.fillStyle = '#333';
     ctx.fillText('AM2020DY(' + am2020.length + ')', pad.l + 18, 8);
-    ctx.setFillStyle(metric.color2);
+    ctx.fillStyle = metric.color2;
     ctx.fillRect(pad.l + 120, 8, 14, 10);
-    ctx.setFillStyle('#333');
+    ctx.fillStyle = '#333';
     ctx.fillText('SEN68(' + sen68.length + ')', pad.l + 138, 8);
-
-    ctx.draw();
   }
 });
