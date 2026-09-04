@@ -1,11 +1,28 @@
 {
   "pages": [
-    "pages/index/index"
+    "pages/index/index",
+    "pages/history/history"
   ],
   "window": {
     "navigationBarTitleText": "环境监测",
     "navigationBarBackgroundColor": "#1a73e8",
     "navigationBarTextStyle": "white"
+  },
+  "tabBar": {
+    "color": "#999",
+    "selectedColor": "#1a73e8",
+    "backgroundColor": "#fff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "实时数据"
+      },
+      {
+        "pagePath": "pages/history/history",
+        "text": "历史曲线"
+      }
+    ]
   },
   "sitemapLocation": "sitemap.json"
 }

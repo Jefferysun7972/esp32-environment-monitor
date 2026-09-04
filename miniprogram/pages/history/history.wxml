@@ -1,0 +1,61 @@
+<view class="container">
+  <view class="controls">
+    <view class="section-title">时间范围</view>
+    <view class="chip-row">
+      <view
+        wx:for="{{ranges}}"
+        wx:key="key"
+        class="chip {{selectedRange === item.key ? 'active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onRangeTap"
+      >{{item.label}}</view>
+    </view>
+
+    <view class="section-title">指标选择</view>
+    <view class="chip-row wrap">
+      <view
+        wx:for="{{metrics}}"
+        wx:key="key"
+        class="chip {{selectedMetric === item.key ? 'active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onMetricTap"
+      >{{item.label}}</view>
+    </view>
+  </view>
+
+  <view class="chart-container">
+    <view wx:if="{{loading}}" class="loading">加载中...</view>
+    <view wx:elif="{{!chartData || chartData.length === 0}}" class="empty">
+      <text class="empty-text">暂无数据</text>
+      <text class="empty-hint">请确保 ESP32 正在运行</text>
+    </view>
+    <canvas
+      wx:else
+      type="2d"
+      id="historyCanvas"
+      class="chart-canvas"
+      style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
+    ></canvas>
+  </view>
+
+  <view class="data-table" wx:if="{{chartData && chartData.length > 0}}">
+    <view class="section-title">数据明细</view>
+    <view class="table-header">
+      <text class="col-time">时间</text>
+      <text class="col-sensor">传感器</text>
+      <text class="col-value">数值</text>
+    </view>
+    <scroll-view scroll-y class="table-body">
+      <view
+        wx:for="{{chartData}}"
+        wx:key="time"
+        wx:for-item="row"
+        class="table-row"
+      >
+        <text class="col-time">{{row.displayTime}}</text>
+        <text class="col-sensor">{{row.sensor === 'am2020dy' ? 'AM2020DY' : 'SEN68'}}</text>
+        <text class="col-value">{{row.value}} {{metricUnit}}</text>
+      </view>
+    </scroll-view>
+  </view>
+</view>

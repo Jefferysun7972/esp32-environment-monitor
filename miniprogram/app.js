@@ -94,5 +94,89 @@ App({
         this.globalData.lastUpdate
       );
     }
+  },
+
+  fetchHistory(range, field, callback) {
+    const fields = {
+      temp: '温度',
+      humi: '湿度',
+      pm25: 'PM2.5',
+      pm1: 'PM1.0',
+      pm10: 'PM10',
+      tvoc: 'TVOC',
+      hcho: 'HCHO',
+      no2: 'NO₂',
+      nox: 'NOx',
+      co2: 'CO₂'
+    };
+
+    const query = `from(bucket: "sensor_data")
+  |> range(start: -${range})
+  |> filter(fn: (r) => r._measurement == "am2020dy" or r._measurement == "SEN68")
+  |> filter(fn: (r) => r._field == "${field}")
+  |> aggregateWindow(every: ${this.getWindow(range)}, fn: mean)`;
+
+    wx.request({
+      url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
+      method: 'POST',
+      header: {
+        'Authorization': 'Token ' + INFLUXDB_TOKEN,
+        'Content-Type': 'application/vnd.flux',
+        'Accept': 'application/csv'
+      },
+      data: query,
+      success: (res) => {
+        if (res.statusCode === 200) {
+          const data = this.parseTimeCSV(res.data);
+          callback(null, data);
+        } else {
+          callback('查询失败: ' + res.statusCode, null);
+        }
+      },
+      fail: (err) => {
+        callback(err.errMsg || '网络错误', null);
+      }
+    });
+  },
+
+  getWindow(range) {
+    if (range === '1h') return '1m';
+    if (range === '6h') return '5m';
+    return '15m';
+  },
+
+  parseTimeCSV(csv) {
+    const lines = csv.trim().split('\n');
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split(',');
+    const timeIdx = headers.indexOf('_time');
+    const measurementIdx = headers.indexOf('_measurement');
+    const fieldIdx = headers.indexOf('_field');
+    const valueIdx = headers.indexOf('_value');
+
+    if (timeIdx < 0 || valueIdx < 0) return [];
+
+    const result = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      const timeStr = cols[timeIdx];
+      let displayTime = timeStr;
+      try {
+        const d = new Date(timeStr);
+        displayTime = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+          String(d.getHours()).padStart(2, '0') + ':' +
+          String(d.getMinutes()).padStart(2, '0');
+      } catch (e) {}
+
+      result.push({
+        time: timeStr,
+        displayTime: displayTime,
+        sensor: cols[measurementIdx] || '',
+        field: cols[fieldIdx] || '',
+        value: parseFloat(cols[valueIdx])
+      });
+    }
+    return result;
   }
 });
