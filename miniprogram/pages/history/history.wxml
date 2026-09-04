@@ -24,17 +24,18 @@
   </view>
 
   <view class="chart-container">
-    <view wx:if="{{loading}}" class="loading">加载中...</view>
-    <view wx:elif="{{!chartData || chartData.length === 0}}" class="empty">
-      <text class="empty-text">暂无数据</text>
-      <text class="empty-hint">请确保 ESP32 正在运行</text>
-    </view>
     <canvas
-      wx:else
       type="2d"
       id="historyCanvas"
       class="chart-canvas"
     ></canvas>
+    <view wx:if="{{loading}}" class="overlay">
+      <text class="loading">加载中...</text>
+    </view>
+    <view wx:elif="{{!chartData || chartData.length === 0}}" class="overlay">
+      <text class="empty-text">暂无数据</text>
+      <text class="empty-hint">请确保 ESP32 正在运行</text>
+    </view>
   </view>
 
   <view class="data-table" wx:if="{{chartData && chartData.length > 0}}">

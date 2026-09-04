@@ -41,7 +41,7 @@ Page({
 
   onShow() {
     if (this.data.chartData) {
-      setTimeout(() => this.drawChart(), 300);
+      setTimeout(() => this.drawChart(), 100);
     }
   },
 
@@ -76,7 +76,7 @@ Page({
         value: Math.round(d.value * 10) / 10
       }));
       this.setData({ chartData: rounded });
-      setTimeout(() => this.drawChart(), 300);
+      setTimeout(() => this.drawChart(), 100);
     });
   },
 
@@ -88,11 +88,7 @@ Page({
     query.select('#historyCanvas')
       .fields({ node: true, size: true })
       .exec((res) => {
-        if (!res[0] || !res[0].node) {
-          // Retry once after layout
-          setTimeout(() => this.drawChart(), 200);
-          return;
-        }
+        if (!res[0] || !res[0].node) return;
         const canvas = res[0].node;
         const ctx = canvas.getContext('2d');
         const dpr = wx.getSystemInfoSync().pixelRatio;
