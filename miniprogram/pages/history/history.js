@@ -56,8 +56,8 @@ Page({
     this.setData({ loading: true });
     const app = getApp();
     app.fetchHistory(this.data.selectedRange, this.data.selectedMetric, (err, data) => {
-      this.setData({ loading: false });
       if (err) {
+        this.setData({ loading: false });
         wx.showToast({ title: err, icon: 'none' });
         return;
       }
@@ -65,17 +65,24 @@ Page({
         ...d,
         value: Math.round(d.value * 10) / 10
       }));
-      this.setData({ chartData: rounded }, () => {
-        this.drawChart();
+      this.setData({ chartData: rounded, loading: false }, () => {
+        setTimeout(() => this.drawChart(), 300);
       });
     });
   },
 
-  drawChart() {
+  drawChart(retryCount) {
+    retryCount = retryCount || 0;
     const data = this.data.chartData;
     if (!data || data.length === 0) return;
 
     const ctx = wx.createCanvasContext('historyCanvas', this);
+    if (!ctx) {
+      if (retryCount < 3) {
+        setTimeout(() => this.drawChart(retryCount + 1), 300);
+      }
+      return;
+    }
     const W = this.data.canvasWidth;
     const H = this.data.canvasHeight;
     const pad = { t: 20, r: 12, b: 38, l: 44 };

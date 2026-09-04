@@ -119,6 +119,7 @@ App({
     wx.request({
       url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
       method: 'POST',
+      timeout: 30000,
       header: {
         'Authorization': 'Token ' + INFLUXDB_TOKEN,
         'Content-Type': 'application/vnd.flux',
