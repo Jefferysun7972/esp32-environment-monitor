@@ -183,8 +183,8 @@ Page({
 
     const metric = METRICS.find(m => m.key === this.data.selectedMetric);
 
-    drawLine(am202Data, metric.color1, false);
-    drawPoints(am202Data, metric.color1);
+    drawLine(am2020Data, metric.color1, false);
+    drawPoints(am2020Data, metric.color1);
     drawLine(sen68Data, metric.color2, true);
     drawPoints(sen68Data, metric.color2);
 

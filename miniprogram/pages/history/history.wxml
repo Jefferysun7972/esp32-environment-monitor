@@ -48,7 +48,7 @@
     <scroll-view scroll-y class="table-body">
       <view
         wx:for="{{chartData}}"
-        wx:key="time"
+        wx:key="_key"
         wx:for-item="row"
         class="table-row"
       >

@@ -183,7 +183,8 @@ App({
         displayTime: displayTime,
         sensor: cols[measurementIdx] || '',
         field: cols[fieldIdx] || '',
-        value: parseFloat(cols[valueIdx])
+        value: parseFloat(cols[valueIdx]),
+        _key: (i + '_' + (cols[measurementIdx] || '') + '_' + timeStr)
       });
     }
     return result;
