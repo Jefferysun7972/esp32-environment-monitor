@@ -158,6 +158,24 @@
   color: #ff6d00;
 }
 
+.table-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-title-row .section-title {
+  margin-bottom: 0;
+}
+
+.export-btn {
+  font-size: 22rpx;
+  color: #1a73e8;
+  padding: 6rpx 16rpx;
+  border: 1rpx solid #1a73e8;
+  border-radius: 20rpx;
+}
+
 .data-table {
   background: #fff;
   border-radius: 16rpx;

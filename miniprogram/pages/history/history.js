@@ -54,7 +54,8 @@ Page({
     tableData: null,
     stats: null,
     canvasWidth: 0,
-    canvasHeight: 220
+    canvasHeight: 220,
+    metricUnit: '°C'
   },
 
   onLoad() {
@@ -377,6 +378,26 @@ Page({
       lines.forEach((line, i) => {
         ctx.fillText(line, bx + 10, by + 8 + i * fontH);
       });
-    }
+    });
+
+  onExportCsv() {
+    const { tableData, selectedMetric } = this.data;
+    if (!tableData || tableData.length === 0) return;
+    const metric = METRICS.find(m => m.key === selectedMetric);
+    const unit = metric ? metric.unit : '';
+
+    let csv = '\uFEFF时间,AM2020DY(' + unit + '),SEN68(' + unit + ')\n';
+    tableData.forEach(row => {
+      const a = row.am2020dy !== undefined ? row.am2020dy : '';
+      const s = row.SEN68 !== undefined ? row.SEN68 : '';
+      csv += row.displayTime + ',' + a + ',' + s + '\n';
+    });
+
+    wx.setClipboardData({
+      data: csv,
+      success: () => {
+        wx.showToast({ title: 'CSV 已复制到剪贴板', icon: 'success' });
+      }
+    });
   }
 });
