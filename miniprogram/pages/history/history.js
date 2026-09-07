@@ -55,7 +55,9 @@ Page({
     stats: null,
     canvasWidth: 0,
     canvasHeight: 220,
-    metricUnit: '°C'
+    metricUnit: '°C',
+    showAm2020: true,
+    showSen68: true
   },
 
   onLoad() {
@@ -190,7 +192,23 @@ Page({
     this.drawChart({ idx: bestIdx, x, y });
   },
 
-  onCanvasTouchEnd() {
+  onCanvasTouchEnd(e) {
+    const touch = e.changedTouches[0];
+    const meta = this._chartMeta;
+
+    // Check if tap on legend
+    if (meta && touch) {
+      const legX = meta.pad.l + meta.pw - 195;
+      if (touch.x >= legX && touch.x <= legX + 105 && touch.y >= 6 && touch.y <= 26) {
+        this.setData({ showAm2020: !this.data.showAm2020 }, () => this.drawChart());
+        return;
+      }
+      if (touch.x >= legX + 120 && touch.x <= legX + 195 && touch.y >= 6 && touch.y <= 26) {
+        this.setData({ showSen68: !this.data.showSen68 }, () => this.drawChart());
+        return;
+      }
+    }
+
     this.drawChart();
   },
 
@@ -323,21 +341,21 @@ Page({
       ctx.stroke();
     };
 
-    drawSeries(am2020, metric.color1);
-    drawSeries(sen68, metric.color2);
+    if (this.data.showAm2020) drawSeries(am2020, metric.color1);
+    if (this.data.showSen68) drawSeries(sen68, metric.color2);
 
-    // Legend with counts
+    // Legend with counts (tap to toggle)
     const legX = pad.l + pw - 195;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = metric.color1;
+    ctx.fillStyle = this.data.showAm2020 ? metric.color1 : '#ccc';
     ctx.fillRect(legX, 8, 14, 10);
-    ctx.fillStyle = '#333';
+    ctx.fillStyle = this.data.showAm2020 ? '#333' : '#ccc';
     ctx.fillText('AM2020DY(' + am2020.length + ')', legX + 18, 8);
-    ctx.fillStyle = metric.color2;
+    ctx.fillStyle = this.data.showSen68 ? metric.color2 : '#ccc';
     ctx.fillRect(legX + 120, 8, 14, 10);
-    ctx.fillStyle = '#333';
+    ctx.fillStyle = this.data.showSen68 ? '#333' : '#ccc';
     ctx.fillText('SEN68(' + sen68.length + ')', legX + 138, 8);
 
     // Save metadata for touch handler
