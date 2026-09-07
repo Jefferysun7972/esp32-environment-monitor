@@ -276,7 +276,7 @@ Page({
       ctx.fillText(ref[N - 1].displayTime, sx(N - 1), pad.t + ph + 6 + (isLongRange && seq % 2 ? 14 : 0));
     }
 
-    // Draw one series
+    // Draw one series (smooth bezier for 3+ points, straight for 2)
     const drawSeries = (series, color) => {
       if (series.length === 0) return;
       const M = series.length;
@@ -290,9 +290,27 @@ Page({
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(sx(0), sy(series[0].value));
-      for (let i = 1; i < M; i++) {
-        ctx.lineTo(sx(i * (N - 1) / (M - 1)), sy(series[i].value));
+      const xs = (i) => sx(i * (N - 1) / Math.max(M - 1, 1));
+      const ys = (i) => sy(series[i].value);
+      ctx.moveTo(xs(0), ys(0));
+      if (M === 2) {
+        ctx.lineTo(xs(1), ys(1));
+      } else {
+        for (let i = 0; i < M - 1; i++) {
+          const x0 = i > 0 ? xs(i - 1) : xs(0);
+          const y0 = i > 0 ? ys(i - 1) : ys(0);
+          const x1 = xs(i);
+          const y1 = ys(i);
+          const x2 = xs(i + 1);
+          const y2 = ys(i + 1);
+          const x3 = i + 2 < M ? xs(i + 2) : xs(M - 1);
+          const y3 = i + 2 < M ? ys(i + 2) : ys(M - 1);
+          const cp1x = x1 + (x2 - x0) / 6;
+          const cp1y = y1 + (y2 - y0) / 6;
+          const cp2x = x2 - (x3 - x1) / 6;
+          const cp2y = y2 - (y3 - y1) / 6;
+          ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x2, y2);
+        }
       }
       ctx.stroke();
     };
