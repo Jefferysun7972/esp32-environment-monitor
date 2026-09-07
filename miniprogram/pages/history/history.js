@@ -70,6 +70,12 @@ Page({
     }
   },
 
+  onPullDownRefresh() {
+    this.loadData(() => {
+      wx.stopPullDownRefresh();
+    });
+  },
+
   onMetricTap(e) {
     const key = e.currentTarget.dataset.key;
     this.setData({ selectedMetric: key });
@@ -82,13 +88,14 @@ Page({
     this.loadData();
   },
 
-  loadData() {
+  loadData(callback) {
     this.setData({ loading: true });
     const app = getApp();
     app.fetchHistory(this.data.selectedRange, this.data.selectedMetric, (err, data) => {
       if (err) {
         this.setData({ loading: false });
         wx.showToast({ title: err, icon: 'none' });
+        if (callback) callback();
         return;
       }
       const rounded = (data || []).map(d => ({
@@ -124,6 +131,7 @@ Page({
 
       this.setData({ chartData: rounded, tableData, stats, loading: false }, () => {
         setTimeout(() => this.drawChart(), 200);
+        if (callback) callback();
       });
     });
   },
