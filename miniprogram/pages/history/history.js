@@ -196,12 +196,6 @@ Page({
     const ref = am2020.length >= sen68.length ? am2020 : sen68;
     const N = Math.max(ref.length, 1);
 
-    // Show data point counts in legend
-    this.setData({
-      am2020Count: am2020.length,
-      sen68Count: sen68.length
-    });
-
     const vals = data.map(d => d.value);
     let minV = Math.min(...vals), maxV = Math.max(...vals);
     if (minV === maxV) { minV -= 1; maxV += 1; }
