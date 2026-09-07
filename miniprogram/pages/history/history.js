@@ -100,7 +100,7 @@ Page({
     });
   },
 
-  drawChart() {
+  drawChart(touchPoint) {
     const data = this.data.chartData;
     if (!data || data.length === 0) return;
 
@@ -109,7 +109,6 @@ Page({
       .fields({ node: true, size: true })
       .exec((res) => {
         if (!res || !res[0] || !res[0].node) {
-          // Retry once
           setTimeout(() => this.drawChart(), 300);
           return;
         }
@@ -124,11 +123,42 @@ Page({
         const ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
 
-        this.renderChart(ctx, data, W, H);
+        this.renderChart(ctx, data, W, H, touchPoint);
       });
   },
 
-  renderChart(ctx, data, W, H) {
+  onCanvasTouch(e) {
+    const meta = this._chartMeta;
+    if (!meta) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const x = touch.x;
+    const y = touch.y;
+
+    // Find nearest data point by x
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let i = 0; i < meta.N; i++) {
+      const dist = Math.abs(meta.sx(i) - x);
+      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+    }
+
+    // Only show if within plot area
+    if (x < meta.pad.l || x > meta.pad.l + meta.pw ||
+        y < meta.pad.t || y > meta.pad.t + meta.ph) {
+      this.drawChart();
+      return;
+    }
+
+    this.drawChart({ idx: bestIdx, x, y });
+  },
+
+  onCanvasTouchEnd() {
+    this.drawChart();
+  },
+
+  renderChart(ctx, data, W, H, touchPoint) {
     const pad = { t: 20, r: 12, b: 38, l: 44 };
     const pw = W - pad.l - pad.r;
     const ph = H - pad.t - pad.b;
@@ -232,5 +262,65 @@ Page({
     ctx.fillRect(pad.l + 120, 8, 14, 10);
     ctx.fillStyle = '#333';
     ctx.fillText('SEN68(' + sen68.length + ')', pad.l + 138, 8);
+
+    // Save metadata for touch handler
+    this._chartMeta = { am2020, sen68, ref, N, pad, sx, sy, pw, ph, metric };
+
+    // Draw crosshair + tooltip
+    if (touchPoint) {
+      const { idx, x, y } = touchPoint;
+      const cx = sx(idx);
+      const t = ref[idx];
+
+      // Crosshair lines
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(pad.l, y);
+      ctx.lineTo(pad.l + pw, y);
+      ctx.moveTo(cx, pad.t);
+      ctx.lineTo(cx, pad.t + ph);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Dot on the reference series
+      ctx.fillStyle = '#333';
+      ctx.beginPath();
+      ctx.arc(cx, sy(ref.value), 4, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Tooltip box
+      const amVal = am2020.length > 0 && idx < am2020.length
+        ? am2020[Math.round(idx * (am2020.length - 1) / Math.max(N - 1, 1))].value : null;
+      const seVal = sen68.length > 0 && idx < sen68.length
+        ? sen68[Math.round(idx * (sen68.length - 1) / Math.max(N - 1, 1))].value : null;
+
+      const lines = [
+        t.displayTime,
+        'AM2020DY: ' + (amVal !== null ? amVal.toFixed(1) + metric.unit : '--'),
+        'SEN68: ' + (seVal !== null ? seVal.toFixed(1) + metric.unit : '--')
+      ];
+      const fontH = 14;
+      const boxW = 180;
+      const boxH = lines.length * fontH + 16;
+      let bx = cx + 10;
+      let by = y - boxH - 10;
+      if (bx + boxW > W) bx = cx - boxW - 10;
+      if (by < 0) by = y + 10;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(bx, by, boxW, boxH, 6) : ctx.fillRect(bx, by, boxW, boxH);
+      ctx.fill();
+
+      ctx.fillStyle = '#fff';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      lines.forEach((line, i) => {
+        ctx.fillText(line, bx + 10, by + 8 + i * fontH);
+      });
+    }
   }
 });
