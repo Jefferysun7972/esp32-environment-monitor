@@ -137,6 +137,8 @@ Page({
     const sx = (i) => pad.l + (i / Math.max(N - 1, 1)) * pw;
     const sy = (v) => pad.t + ph - ((v - minV) / (maxV - minV)) * ph;
 
+    const metric = METRICS.find(m => m.key === this.data.selectedMetric);
+
     ctx.clearRect(0, 0, W, H);
 
     // Background
@@ -157,10 +159,11 @@ Page({
       ctx.moveTo(pad.l, y);
       ctx.lineTo(pad.l + pw, y);
       ctx.stroke();
-      ctx.fillText(v.toFixed(1), pad.l - 6, y);
+      ctx.fillText(v.toFixed(1) + metric.unit, pad.l - 6, y);
     }
 
     // X-axis labels
+    const isLongRange = this.data.selectedRange === '24h';
     const labelMax = Math.min(5, N);
     const labelStep = Math.max(1, Math.floor(N / labelMax));
     ctx.fillStyle = '#999';
@@ -169,11 +172,11 @@ Page({
     ctx.textBaseline = 'top';
     let seq = 0;
     for (let i = 0; i < N; i += labelStep) {
-      ctx.fillText(ref[i].displayTime, sx(i), pad.t + ph + 6 + (seq % 2 ? 14 : 0));
+      ctx.fillText(ref[i].displayTime, sx(i), pad.t + ph + 6 + (isLongRange && seq % 2 ? 14 : 0));
       seq++;
     }
     if (labelMax > 1 && (N - 1) % labelStep !== 0 && N > 1) {
-      ctx.fillText(ref[N - 1].displayTime, sx(N - 1), pad.t + ph + 6 + (seq % 2 ? 14 : 0));
+      ctx.fillText(ref[N - 1].displayTime, sx(N - 1), pad.t + ph + 6 + (isLongRange && seq % 2 ? 14 : 0));
     }
 
     // Draw one series
@@ -197,7 +200,6 @@ Page({
       ctx.stroke();
     };
 
-    const metric = METRICS.find(m => m.key === this.data.selectedMetric);
     drawSeries(am2020, metric.color1);
     drawSeries(sen68, metric.color2);
 
