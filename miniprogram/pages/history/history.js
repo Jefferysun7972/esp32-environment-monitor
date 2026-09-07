@@ -212,7 +212,7 @@ Page({
     // Unit label at top of Y-axis
     ctx.fillStyle = '#999';
     ctx.font = '9px sans-serif';
-    ctx.textAlign = 'right';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText(metric.unit, pad.l - 6, pad.t - 4);
 
