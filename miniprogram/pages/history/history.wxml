@@ -14,12 +14,29 @@
     <view class="section-title">指标选择</view>
     <view class="chip-row wrap">
       <view
-        wx:for="{{metrics}}"
-        wx:key="key"
-        class="chip {{selectedMetric === item.key ? 'active' : ''}}"
-        data-key="{{item.key}}"
-        bindtap="onMetricTap"
-      >{{item.label}}</view>
+        class="chip temp-chip {{selectedMetric === 'temp' ? 'active' : ''}}"
+        bindtap="onTempChipTap"
+      >温度 ▾</view>
+      <block wx:for="{{metrics}}" wx:key="key">
+        <view
+          wx:if="{{item.key !== 'temp'}}"
+          class="chip {{selectedMetric === item.key ? 'active' : ''}} {{!item.supported ? 'disabled' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="{{item.supported ? 'onMetricTap' : ''}}"
+        >{{item.label}}</view>
+      </block>
+    </view>
+    <view class="chip-row wrap unit-dropdown" wx:if="{{tempDropdownOpen}}">
+      <view
+        class="chip sub {{tempUnit === '°C' ? 'active' : ''}}"
+        data-unit="°C"
+        bindtap="onTempUnitChange"
+      >°C 摄氏度</view>
+      <view
+        class="chip sub {{tempUnit === '°F' ? 'active' : ''}}"
+        data-unit="°F"
+        bindtap="onTempUnitChange"
+      >°F 华氏度</view>
     </view>
   </view>
 
@@ -45,37 +62,20 @@
   <view class="stats-bar" wx:if="{{stats}}">
     <view class="section-title">统计摘要</view>
     <view class="stats-grid">
-      <view class="stats-card">
-        <text class="stats-sensor">AM2020DY</text>
+      <view class="stats-card" wx:for="{{sensors}}" wx:key="id" wx:if="{{showSensor[index]}}">
+        <text class="stats-sensor">{{item.label}}</text>
         <view class="stats-row">
           <view class="stats-item">
             <text class="stats-label">最小</text>
-            <text class="stats-value min">{{stats.am2020dy.min}}</text>
+            <text class="stats-value min">{{stats[item.id].min}}</text>
           </view>
           <view class="stats-item">
             <text class="stats-label">最大</text>
-            <text class="stats-value max">{{stats.am2020dy.max}}</text>
+            <text class="stats-value max">{{stats[item.id].max}}</text>
           </view>
           <view class="stats-item">
             <text class="stats-label">平均</text>
-            <text class="stats-value avg">{{stats.am2020dy.avg}}</text>
-          </view>
-        </view>
-      </view>
-      <view class="stats-card">
-        <text class="stats-sensor">SEN68</text>
-        <view class="stats-row">
-          <view class="stats-item">
-            <text class="stats-label">最小</text>
-            <text class="stats-value min">{{stats.sen68.min}}</text>
-          </view>
-          <view class="stats-item">
-            <text class="stats-label">最大</text>
-            <text class="stats-value max">{{stats.sen68.max}}</text>
-          </view>
-          <view class="stats-item">
-            <text class="stats-label">平均</text>
-            <text class="stats-value avg">{{stats.sen68.avg}}</text>
+            <text class="stats-value avg">{{stats[item.id].avg}}</text>
           </view>
         </view>
       </view>
@@ -90,8 +90,7 @@
 
     <view class="table-header">
       <text class="col-time">时间</text>
-      <text class="col-val">AM2020DY</text>
-      <text class="col-val">SEN68</text>
+      <text wx:for="{{sensors}}" wx:key="id" class="col-val">{{item.label}}</text>
     </view>
     <scroll-view scroll-y class="table-body">
       <view
@@ -101,8 +100,7 @@
         class="table-row"
       >
         <text class="col-time">{{row.displayTime}}</text>
-        <text class="col-val">{{row.am2020dy !== undefined ? row.am2020dy : '--'}} {{metricUnit}}</text>
-        <text class="col-val">{{row.SEN68 !== undefined ? row.SEN68 : '--'}} {{metricUnit}}</text>
+        <text wx:for="{{row.measurements}}" wx:key="*this" class="col-val">{{item !== null ? item : '--'}} {{metricUnit}}</text>
       </view>
     </scroll-view>
   </view>

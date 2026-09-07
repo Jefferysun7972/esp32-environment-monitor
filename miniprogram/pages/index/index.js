@@ -1,7 +1,9 @@
+const { SENSORS, FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS } = require('../../config/sensors');
+
 Page({
   data: {
-    am2020dy: {},
-    sen68: {},
+    sensorData: {},
+    sensorCards: [],
     connected: false,
     lastUpdate: ''
   },
@@ -10,18 +12,46 @@ Page({
     const app = getApp();
     this.onSensorUpdate = (data, connected, lastUpdate) => {
       this.setData({
-        am2020dy: data.am2020dy || {},
-        sen68: data.sen68 || {},
+        sensorData: data,
         connected: connected,
         lastUpdate: lastUpdate || ''
       });
+      this._buildCards(data);
     };
 
     this.setData({
-      am2020dy: app.globalData.sensorData.am2020dy || {},
-      sen68: app.globalData.sensorData.sen68 || {},
+      sensorData: app.globalData.sensorData,
       connected: app.globalData.connected
     });
+    this._buildCards(app.globalData.sensorData);
+  },
+
+  _buildCards(sensorData) {
+    const cards = SENSORS.map(s => {
+      const data = sensorData[s.id] || {};
+      const allMetrics = s.fields.map(f => ({
+        key: f,
+        label: FIELD_LABELS[f] || f,
+        unit: FIELD_UNITS[f] || '',
+        cssClass: FIELD_CSS_CLASS[f] || '',
+        value: data[f] !== undefined ? data[f] : '--'
+      }));
+
+      // Split metrics into rows according to rowLayout
+      const rows = [];
+      let cursor = 0;
+      (s.rowLayout || [s.fields.length]).forEach((cols, idx) => {
+        rows.push({
+          cols: cols,
+          metrics: allMetrics.slice(cursor, cursor + cols),
+          rowKey: 'row' + idx
+        });
+        cursor += cols;
+      });
+
+      return { ...s, rows };
+    });
+    this.setData({ sensorCards: cards });
   },
 
   onRefresh() {

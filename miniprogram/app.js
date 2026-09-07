@@ -2,12 +2,11 @@ const INFLUXDB_URL = 'https://us-east-1-1.aws.cloud2.influxdata.com';
 const INFLUXDB_ORG = 'Fellowes';
 const INFLUXDB_TOKEN = 'doR-H4EoxcxidC5AYN0NjzYQB7kJ5cusQvXe16b7j1W_tO4ouL35MlFayhPfTlnxR0djAgCwCFfgOVZSCXyzog==';
 
+const { SENSORS, ALL_FIELDS } = require('./config/sensors');
+
 App({
   globalData: {
-    sensorData: {
-      am2020dy: {},
-      sen68: {}
-    },
+    sensorData: Object.fromEntries(SENSORS.map(s => [s.id, {}])),
     connected: false,
     lastUpdate: ''
   },
@@ -18,14 +17,15 @@ App({
   },
 
   fetchData() {
-    const sensors = ['am2020dy', 'SEN68'];
+    const measurements = SENSORS.map(s => s.measurement);
     let completed = 0;
 
-    sensors.forEach((sensor) => {
+    measurements.forEach((measurement) => {
+      const fieldFilter = ALL_FIELDS.map(f => `r._field == "${f}"`).join(' or ');
       const query = `from(bucket: "sensor_data")
   |> range(start: -1m)
-  |> filter(fn: (r) => r._measurement == "${sensor}")
-  |> filter(fn: (r) => r._field == "temp" or r._field == "humi" or r._field == "pm1" or r._field == "pm25" or r._field == "pm10" or r._field == "tvoc" or r._field == "no2" or r._field == "nox" or r._field == "co2" or r._field == "hcho")
+  |> filter(fn: (r) => r._measurement == "${measurement}")
+  |> filter(fn: (r) => ${fieldFilter})
   |> last()`;
 
       wx.request({
@@ -41,7 +41,8 @@ App({
           if (res.statusCode === 200) {
             const parsed = this.parseCSV(res.data);
             if (parsed.length > 0) {
-              const key = sensor === 'SEN68' ? 'sen68' : 'am2020dy';
+              const sensor = SENSORS.find(s => s.measurement === measurement);
+              const key = sensor ? sensor.id : measurement;
               const entry = this.globalData.sensorData[key] || {};
               parsed.forEach(row => {
                 entry[row.field] = parseFloat(row.value);
@@ -51,11 +52,11 @@ App({
           }
         },
         fail: (err) => {
-          console.error('fetch error for', sensor, err);
+          console.error('fetch error for', measurement, err);
         },
         complete: () => {
           completed++;
-          if (completed === sensors.length) {
+          if (completed === measurements.length) {
             this.globalData.connected = true;
             this.globalData.lastUpdate = new Date().toLocaleTimeString();
             this.notifyPages();
@@ -97,22 +98,10 @@ App({
   },
 
   fetchHistory(range, field, callback) {
-    const fields = {
-      temp: '温度',
-      humi: '湿度',
-      pm25: 'PM2.5',
-      pm1: 'PM1.0',
-      pm10: 'PM10',
-      tvoc: 'TVOC',
-      hcho: 'HCHO',
-      no2: 'NO₂',
-      nox: 'NOx',
-      co2: 'CO₂'
-    };
-
+    const measurementFilter = SENSORS.map(s => `r._measurement == "${s.measurement}"`).join(' or ');
     const query = `from(bucket: "sensor_data")
   |> range(start: -${range})
-  |> filter(fn: (r) => r._measurement == "am2020dy" or r._measurement == "SEN68")
+  |> filter(fn: (r) => ${measurementFilter})
   |> filter(fn: (r) => r._field == "${field}")
   |> aggregateWindow(every: ${this.getWindow(range)}, fn: mean)`;
 
@@ -128,7 +117,7 @@ App({
       data: query,
       success: (res) => {
         if (res.statusCode === 200) {
-          const data = this.parseTimeCSV(res.data);
+          const data = this.parseTimeCSV(res.data, range);
           callback(null, data);
         } else {
           callback('查询失败: ' + res.statusCode, null);
@@ -146,7 +135,7 @@ App({
     return '15m';
   },
 
-  parseTimeCSV(csv) {
+  parseTimeCSV(csv, range) {
     const lines = csv.trim().split('\n');
     if (lines.length < 2) return [];
 
@@ -158,6 +147,8 @@ App({
 
     if (timeIdx < 0 || valueIdx < 0) return [];
 
+    const is24h = range === '24h';
+
     const result = [];
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',');
@@ -165,17 +156,23 @@ App({
       let displayTime = timeStr;
       try {
         const d = new Date(timeStr);
-        const now = new Date();
-        const isToday = d.getFullYear() === now.getFullYear() &&
-          d.getMonth() === now.getMonth() &&
-          d.getDate() === now.getDate();
-        if (isToday) {
-          displayTime = String(d.getHours()).padStart(2, '0') + ':' +
-            String(d.getMinutes()).padStart(2, '0');
-        } else {
+        if (is24h) {
           displayTime = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
             String(d.getHours()).padStart(2, '0') + ':' +
             String(d.getMinutes()).padStart(2, '0');
+        } else {
+          const now = new Date();
+          const isToday = d.getFullYear() === now.getFullYear() &&
+            d.getMonth() === now.getMonth() &&
+            d.getDate() === now.getDate();
+          if (isToday) {
+            displayTime = String(d.getHours()).padStart(2, '0') + ':' +
+              String(d.getMinutes()).padStart(2, '0');
+          } else {
+            displayTime = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+              String(d.getHours()).padStart(2, '0') + ':' +
+              String(d.getMinutes()).padStart(2, '0');
+          }
         }
       } catch (e) {}
 
@@ -184,8 +181,7 @@ App({
         displayTime: displayTime,
         sensor: cols[measurementIdx] || '',
         field: cols[fieldIdx] || '',
-        value: parseFloat(cols[valueIdx]),
-        _key: (i + '_' + (cols[measurementIdx] || '') + '_' + timeStr)
+        value: parseFloat(cols[valueIdx])
       });
     }
     return result;

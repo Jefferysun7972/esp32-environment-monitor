@@ -48,6 +48,26 @@
   color: #fff;
 }
 
+.chip.disabled {
+  background: #e8e8e8;
+  color: #c0c0c0;
+}
+
+.unit-dropdown {
+  margin-top: 4rpx;
+}
+
+.chip.sub {
+  font-size: 22rpx;
+  padding: 8rpx 20rpx;
+  background: #f5f5f5;
+}
+
+.chip.sub.active {
+  background: #1a73e8;
+  color: #fff;
+}
+
 .chart-container {
   background: #fff;
   border-radius: 16rpx;

@@ -1,3 +1,5 @@
+const { SENSORS } = require('../../config/sensors');
+
 const METRICS = [
   { key: 'temp', label: '温度', unit: '°C', color1: '#ff6d00', color2: '#ffab40', thresholds: [
     { value: 26, color: '#ff9800', label: '26°C' },
@@ -45,8 +47,9 @@ const RANGES = [
 
 Page({
   data: {
-    metrics: METRICS,
+    metrics: [],
     ranges: RANGES,
+    sensors: SENSORS,
     selectedMetric: 'temp',
     selectedRange: '1h',
     loading: false,
@@ -56,19 +59,32 @@ Page({
     canvasWidth: 0,
     canvasHeight: 220,
     metricUnit: '°C',
-    showAm2020: true,
-    showSen68: true
+    tempUnit: '°C',
+    tempDropdownOpen: false,
+    showSensor: SENSORS.map(() => true)
   },
 
   onLoad() {
+    this._requestSeq = 0;
     const sysInfo = wx.getSystemInfoSync();
     this.setData({ canvasWidth: sysInfo.windowWidth - 48 });
+    this._buildMetrics();
     this.loadData();
+  },
+
+  _buildMetrics() {
+    const allFields = new Set();
+    SENSORS.forEach(s => s.fields.forEach(f => allFields.add(f)));
+    const metrics = METRICS.map(m => ({
+      ...m,
+      supported: allFields.has(m.key)
+    }));
+    this.setData({ metrics });
   },
 
   onShow() {
     if (this.data.chartData) {
-      setTimeout(() => this.drawChart(), 100);
+      setTimeout(() => this.drawChart(), 50);
     }
   },
 
@@ -80,7 +96,9 @@ Page({
 
   onMetricTap(e) {
     const key = e.currentTarget.dataset.key;
-    this.setData({ selectedMetric: key });
+    const metric = this.data.metrics.find(m => m.key === key);
+    if (!metric || !metric.supported) return;
+    this.setData({ selectedMetric: key, tempDropdownOpen: false });
     this.loadData();
   },
 
@@ -90,52 +108,93 @@ Page({
     this.loadData();
   },
 
+  onTempChipTap() {
+    if (this.data.selectedMetric !== 'temp') {
+      this.setData({ selectedMetric: 'temp', tempDropdownOpen: false });
+      this.loadData();
+    } else {
+      this.setData({ tempDropdownOpen: !this.data.tempDropdownOpen });
+    }
+  },
+
   loadData(callback) {
     this.setData({ loading: true });
+    const seq = ++this._requestSeq;
     const app = getApp();
     app.fetchHistory(this.data.selectedRange, this.data.selectedMetric, (err, data) => {
+      if (seq !== this._requestSeq) return;
       if (err) {
         this.setData({ loading: false });
         wx.showToast({ title: err, icon: 'none' });
         if (callback) callback();
         return;
       }
-      const rounded = (data || []).map(d => ({
-        ...d,
-        value: Math.round(d.value * 10) / 10
-      }));
+      this._rawData = data || [];
+      this._processRawData(callback);
+    });
+  },
 
-      // Group by displayTime for table
-      const groupMap = {};
-      rounded.forEach(d => {
-        if (!groupMap[d.displayTime]) {
-          groupMap[d.displayTime] = { displayTime: d.displayTime };
-        }
-        groupMap[d.displayTime][d.sensor] = d.value;
-      });
-      const tableData = Object.values(groupMap);
+  _processRawData(callback) {
+    const rawData = this._rawData || [];
+    const isTemp = this.data.selectedMetric === 'temp';
+    const toFahrenheit = isTemp && this.data.tempUnit === '°F';
 
-      // Compute stats per sensor
-      const am2020Vals = rounded.filter(d => d.sensor === 'am2020dy').map(d => d.value);
-      const sen68Vals = rounded.filter(d => d.sensor === 'SEN68').map(d => d.value);
-      const calcStats = (vals) => {
-        if (vals.length === 0) return { min: '-', max: '-', avg: '-' };
+    const convertVal = (v) => {
+      if (typeof v !== 'number') return v;
+      if (toFahrenheit) return Math.round((v * 9 / 5 + 32) * 10) / 10;
+      return Math.round(v * 10) / 10;
+    };
+
+    const rounded = rawData.map(d => ({
+      ...d,
+      value: convertVal(d.value)
+    }));
+
+    // Group by displayTime for table
+    const groupMap = {};
+    rounded.forEach(d => {
+      if (!groupMap[d.displayTime]) {
+        groupMap[d.displayTime] = { displayTime: d.displayTime };
+      }
+      groupMap[d.displayTime][d.sensor] = d.value;
+    });
+    const tableData = Object.values(groupMap).map(row => ({
+      displayTime: row.displayTime,
+      measurements: SENSORS.map(s => row[s.measurement] !== undefined ? row[s.measurement] : null)
+    }));
+
+    // Compute stats per sensor (keyed by sensor ID)
+    const stats = {};
+    SENSORS.forEach(s => {
+      const vals = rounded.filter(d => d.sensor === s.measurement).map(d => d.value);
+      if (vals.length === 0) {
+        stats[s.id] = { min: '-', max: '-', avg: '-' };
+      } else {
         const min = Math.min(...vals);
         const max = Math.max(...vals);
         const sum = vals.reduce((a, b) => a + b, 0);
         const avg = sum / vals.length;
-        return { min: min.toFixed(1), max: max.toFixed(1), avg: avg.toFixed(1) };
-      };
-      const stats = {
-        am2020dy: calcStats(am2020Vals),
-        sen68: calcStats(sen68Vals)
-      };
-
-      this.setData({ chartData: rounded, tableData, stats, loading: false }, () => {
-        setTimeout(() => this.drawChart(), 100);
-        if (callback) callback();
-      });
+        stats[s.id] = { min: min.toFixed(1), max: max.toFixed(1), avg: avg.toFixed(1) };
+      }
     });
+
+    const metric = METRICS.find(m => m.key === this.data.selectedMetric);
+    const metricUnit = isTemp && toFahrenheit ? '°F' : (metric ? metric.unit : '');
+
+    this.setData({ chartData: rounded, tableData, stats, metricUnit, loading: false }, () => {
+      wx.nextTick(() => this.drawChart());
+      if (callback) callback();
+    });
+  },
+
+  onTempUnitChange(e) {
+    const unit = e.currentTarget.dataset.unit;
+    this.setData({ tempDropdownOpen: false });
+    if (unit === this.data.tempUnit) return;
+    this.setData({ tempUnit: unit });
+    if (this._rawData) {
+      this._processRawData();
+    }
   },
 
   drawChart(touchPoint) {
@@ -147,9 +206,12 @@ Page({
       .fields({ node: true, size: true })
       .exec((res) => {
         if (!res || !res[0] || !res[0].node) {
-          setTimeout(() => this.drawChart(touchPoint), 100);
+          this._drawRetries = (this._drawRetries || 0) + 1;
+          if (this._drawRetries > 10) return;
+          setTimeout(() => this.drawChart(touchPoint), 30);
           return;
         }
+        this._drawRetries = 0;
         const canvas = res[0].node;
         const W = this.data.canvasWidth;
         const H = this.data.canvasHeight;
@@ -193,19 +255,26 @@ Page({
   },
 
   onCanvasTouchEnd(e) {
-    const touch = e.changedTouches[0];
+    const changedTouches = e.changedTouches;
+    if (!changedTouches || changedTouches.length === 0) {
+      this.drawChart();
+      return;
+    }
+    const touch = changedTouches[0];
     const meta = this._chartMeta;
 
     // Check if tap on legend
     if (meta && touch) {
       const legX = meta.pad.l + meta.pw - 195;
-      if (touch.x >= legX && touch.x <= legX + 105 && touch.y >= 6 && touch.y <= 26) {
-        this.setData({ showAm2020: !this.data.showAm2020 }, () => this.drawChart());
-        return;
-      }
-      if (touch.x >= legX + 120 && touch.x <= legX + 195 && touch.y >= 6 && touch.y <= 26) {
-        this.setData({ showSen68: !this.data.showSen68 }, () => this.drawChart());
-        return;
+      for (let i = 0; i < SENSORS.length; i++) {
+        const offsetX = i * 120;
+        if (touch.x >= legX + offsetX && touch.x <= legX + offsetX + 105 &&
+            touch.y >= 6 && touch.y <= 26) {
+          const showSensor = [...this.data.showSensor];
+          showSensor[i] = !showSensor[i];
+          this.setData({ showSensor }, () => this.drawChart());
+          return;
+        }
       }
     }
 
@@ -217,14 +286,14 @@ Page({
     const pw = W - pad.l - pad.r;
     const ph = H - pad.t - pad.b;
 
-    const am2020 = data.filter(d => d.sensor === 'am2020dy');
-    const sen68 = data.filter(d => d.sensor === 'SEN68');
-    const ref = am2020.length >= sen68.length ? am2020 : sen68;
+    const series = SENSORS.map(s => data.filter(d => d.sensor === s.measurement));
+    const ref = series.reduce((a, b) => a.length >= b.length ? a : b, series[0]);
     const N = Math.max(ref.length, 1);
 
     const visible = [];
-    if (this.data.showAm2020) visible.push(...am2020);
-    if (this.data.showSen68) visible.push(...sen68);
+    SENSORS.forEach((s, i) => {
+      if (this.data.showSensor[i]) visible.push(...series[i]);
+    });
     const vals = visible.length > 0 ? visible.map(d => d.value) : data.map(d => d.value);
     let minV = Math.min(...vals), maxV = Math.max(...vals);
     if (minV === maxV) { minV -= 1; maxV += 1; }
@@ -261,17 +330,21 @@ Page({
     }
 
     // Unit label at top of Y-axis
+    const isTemp = this.data.selectedMetric === 'temp';
+    const isF = isTemp && this.data.tempUnit === '°F';
+    const displayUnit = isF ? '°F' : metric.unit;
     ctx.fillStyle = '#999';
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(metric.unit, pad.l - 6, pad.t - 10);
+    ctx.fillText(displayUnit, pad.l - 6, pad.t - 10);
 
     // Threshold lines
     if (metric.thresholds) {
       metric.thresholds.forEach(t => {
-        if (t.value < minV || t.value > maxV) return;
-        const ty = sy(t.value);
+        const tVal = isF ? t.value * 9 / 5 + 32 : t.value;
+        if (tVal < minV || tVal > maxV) return;
+        const ty = sy(tVal);
         ctx.strokeStyle = t.color;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
@@ -284,25 +357,43 @@ Page({
         ctx.font = '9px sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'bottom';
-        ctx.fillText(t.label, pad.l + pw + 4, ty);
+        const tLabel = isF ? tVal.toFixed(1) + '°F' : t.label;
+        ctx.fillText(tLabel, pad.l + pw + 4, ty);
       });
     }
 
     // X-axis labels
     const isLongRange = this.data.selectedRange === '24h';
     const labelMax = Math.min(5, N);
-    const labelStep = Math.max(1, Math.floor(N / labelMax));
-    ctx.fillStyle = '#999';
-    ctx.font = '10px sans-serif';
+    const labelStep = Math.max(1, Math.ceil(N / labelMax));
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    let seq = 0;
+
+    const drawLabel = (i) => {
+      const label = ref[i].displayTime;
+      if (isLongRange) {
+        const parts = label.split(' ');
+        ctx.fillStyle = '#bbb';
+        ctx.font = '9px sans-serif';
+        ctx.fillText(parts[0] || '', sx(i), pad.t + ph + 6);
+        ctx.fillStyle = '#999';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(parts[1] || '', sx(i), pad.t + ph + 20);
+      } else {
+        ctx.fillStyle = '#999';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(label, sx(i), pad.t + ph + 6);
+      }
+    };
+
     for (let i = 0; i < N; i += labelStep) {
-      ctx.fillText(ref[i].displayTime, sx(i), pad.t + ph + 6 + (isLongRange && seq % 2 ? 14 : 0));
-      seq++;
+      drawLabel(i);
     }
     if (labelMax > 1 && (N - 1) % labelStep !== 0 && N > 1) {
-      ctx.fillText(ref[N - 1].displayTime, sx(N - 1), pad.t + ph + 6 + (isLongRange && seq % 2 ? 14 : 0));
+      const prevIdx = Math.floor((N - 1) / labelStep) * labelStep;
+      if ((N - 1) - prevIdx >= labelStep * 0.4) {
+        drawLabel(N - 1);
+      }
     }
 
     // Draw one series (smooth bezier for 3+ points, straight for 2)
@@ -344,25 +435,26 @@ Page({
       ctx.stroke();
     };
 
-    if (this.data.showAm2020) drawSeries(am2020, metric.color1);
-    if (this.data.showSen68) drawSeries(sen68, metric.color2);
+    const colors = [metric.color1, metric.color2];
+    SENSORS.forEach((s, i) => {
+      if (this.data.showSensor[i]) drawSeries(series[i], colors[i]);
+    });
 
     // Legend with counts (tap to toggle)
     const legX = pad.l + pw - 195;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillStyle = this.data.showAm2020 ? metric.color1 : '#ccc';
-    ctx.fillRect(legX, 8, 14, 10);
-    ctx.fillStyle = this.data.showAm2020 ? '#333' : '#ccc';
-    ctx.fillText('AM2020DY(' + am2020.length + ')', legX + 18, 8);
-    ctx.fillStyle = this.data.showSen68 ? metric.color2 : '#ccc';
-    ctx.fillRect(legX + 120, 8, 14, 10);
-    ctx.fillStyle = this.data.showSen68 ? '#333' : '#ccc';
-    ctx.fillText('SEN68(' + sen68.length + ')', legX + 138, 8);
+    SENSORS.forEach((s, i) => {
+      const offsetX = i * 120;
+      ctx.fillStyle = this.data.showSensor[i] ? colors[i] : '#ccc';
+      ctx.fillRect(legX + offsetX, 8, 14, 10);
+      ctx.fillStyle = this.data.showSensor[i] ? '#333' : '#ccc';
+      ctx.fillText(s.label + '(' + series[i].length + ')', legX + offsetX + 18, 8);
+    });
 
     // Save metadata for touch handler
-    this._chartMeta = { am2020, sen68, ref, N, pad, sx, sy, pw, ph, metric };
+    this._chartMeta = { series, ref, N, pad, sx, sy, pw, ph, metric };
 
     // Draw crosshair + tooltip
     if (touchPoint) {
@@ -388,17 +480,25 @@ Page({
       ctx.arc(cx, sy(ref.value), 4, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Tooltip box
-      const amVal = am2020.length > 0 && idx < am2020.length
-        ? am2020[Math.round(idx * (am2020.length - 1) / Math.max(N - 1, 1))].value : null;
-      const seVal = sen68.length > 0 && idx < sen68.length
-        ? sen68[Math.round(idx * (sen68.length - 1) / Math.max(N - 1, 1))].value : null;
+      // Tooltip box - find each sensor's value at closest time to the touched point
+      const refTime = new Date(ref[idx].time).getTime();
+      const findClosest = (s) => {
+        if (!s || s.length === 0) return null;
+        let best = s[0];
+        let bestDist = Math.abs(new Date(s[0].time).getTime() - refTime);
+        for (let i = 1; i < s.length; i++) {
+          const dist = Math.abs(new Date(s[i].time).getTime() - refTime);
+          if (dist < bestDist) { bestDist = dist; best = s[i]; }
+        }
+        return best.value;
+      };
+      const sensorVals = series.map(findClosest);
 
-      const lines = [
-        t.displayTime,
-        'AM2020DY: ' + (amVal !== null ? amVal.toFixed(1) + metric.unit : '--'),
-        'SEN68: ' + (seVal !== null ? seVal.toFixed(1) + metric.unit : '--')
-      ];
+      const lines = [t.displayTime];
+      SENSORS.forEach((s, i) => {
+        const val = sensorVals[i];
+        lines.push(s.label + ': ' + (val !== null ? val.toFixed(1) + metric.unit : '--'));
+      });
       const fontH = 14;
       const boxW = 180;
       const boxH = lines.length * fontH + 16;
@@ -423,16 +523,15 @@ Page({
   },
 
   onExportCsv() {
-    const { tableData, selectedMetric } = this.data;
+    const { tableData, metricUnit } = this.data;
     if (!tableData || tableData.length === 0) return;
-    const metric = METRICS.find(m => m.key === selectedMetric);
-    const unit = metric ? metric.unit : '';
+    const unit = metricUnit || '';
 
-    let csv = '\uFEFF时间,AM2020DY(' + unit + '),SEN68(' + unit + ')\n';
+    const headers = SENSORS.map(s => s.label + '(' + unit + ')').join(',');
+    let csv = '\uFEFF时间,' + headers + '\n';
     tableData.forEach(row => {
-      const a = row.am2020dy !== undefined ? row.am2020dy : '';
-      const s = row.SEN68 !== undefined ? row.SEN68 : '';
-      csv += row.displayTime + ',' + a + ',' + s + '\n';
+      const vals = row.measurements.map(v => v !== null ? v : '').join(',');
+      csv += row.displayTime + ',' + vals + '\n';
     });
 
     wx.setClipboardData({

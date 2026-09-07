@@ -3,7 +3,7 @@
     <view class="header-bg"></view>
     <view class="header-content">
       <text class="header-title">传感器对比测试</text>
-      <text class="header-subtitle">Environment Monitor</text>
+      <text class="header-subtitle">Sensor Comparison Test</text>
       <view class="status-row">
         <view class="status-dot {{connected ? 'on' : 'off'}}"></view>
         <text class="status-text">{{connected ? '在线' : '离线'}}</text>
@@ -16,107 +16,25 @@
     <text class="pull-hint-text">点击刷新数据</text>
   </view>
 
-  <view class="card am2020dy-card">
+  <view class="card" wx:for="{{sensorCards}}" wx:key="id">
     <view class="card-header">
-      <view class="card-icon am2020dy-icon">AM</view>
+      <view class="card-icon" style="background:{{item.iconBg}};color:{{item.iconColor}}">{{item.shortLabel}}</view>
       <view class="card-title-group">
-        <text class="card-title">AM2020DY</text>
-        <text class="card-model">8-in-1 Sensor Module</text>
+        <text class="card-title">{{item.label}}</text>
+        <text class="card-model">{{item.description}}</text>
       </view>
-      <view class="card-badge">8参数</view>
+      <view class="card-badge" style="background:{{item.iconBg}};color:{{item.iconColor}}">{{item.paramCount}}参数</view>
     </view>
 
-    <view class="grid">
-      <view class="metric">
-        <text class="metric-label">温度</text>
-        <text class="metric-value temp">{{am2020dy.temp || '--'}}<text class="metric-unit">°C</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">湿度</text>
-        <text class="metric-value humi">{{am2020dy.humi || '--'}}<text class="metric-unit">%</text></text>
-      </view>
-    </view>
-    <view class="grid grid-3">
-      <view class="metric">
-        <text class="metric-label">PM1.0</text>
-        <text class="metric-value pm">{{am2020dy.pm1 || '--'}}<text class="metric-unit">µg/m³</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">PM2.5</text>
-        <text class="metric-value pm">{{am2020dy.pm25 || '--'}}<text class="metric-unit">µg/m³</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">PM10</text>
-        <text class="metric-value pm">{{am2020dy.pm10 || '--'}}<text class="metric-unit">µg/m³</text></text>
-      </view>
-    </view>
-    <view class="grid grid-3">
-      <view class="metric">
-        <text class="metric-label">TVOC</text>
-        <text class="metric-value tvoc">{{am2020dy.tvoc || '--'}}<text class="metric-unit">ppb</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">NO₂</text>
-        <text class="metric-value gas">{{am2020dy.no2 || '--'}}<text class="metric-unit">µg/m³</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">HCHO</text>
-        <text class="metric-value hcho">{{am2020dy.hcho || '--'}}<text class="metric-unit">µg/m³</text></text>
-      </view>
-    </view>
-  </view>
-
-  <view class="card sen68-card">
-    <view class="card-header">
-      <view class="card-icon sen68-icon">S6</view>
-      <view class="card-title-group">
-        <text class="card-title">SEN68</text>
-        <text class="card-model">8-in-1 Sensor Module</text>
-      </view>
-      <view class="card-badge sen68-badge">8参数</view>
-    </view>
-
-    <view class="grid">
-      <view class="metric">
-        <text class="metric-label">温度</text>
-        <text class="metric-value temp">{{sen68.temp || '--'}}<text class="metric-unit">°C</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">湿度</text>
-        <text class="metric-value humi">{{sen68.humi || '--'}}<text class="metric-unit">%</text></text>
-      </view>
-    </view>
-    <view class="grid grid-3">
-      <view class="metric">
-        <text class="metric-label">PM1.0</text>
-        <text class="metric-value pm">{{sen68.pm1 || '--'}}<text class="metric-unit">µg/m³</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">PM2.5</text>
-        <text class="metric-value pm">{{sen68.pm25 || '--'}}<text class="metric-unit">µg/m³</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">PM10</text>
-        <text class="metric-value pm">{{sen68.pm10 || '--'}}<text class="metric-unit">µg/m³</text></text>
-      </view>
-    </view>
-    <view class="grid grid-3">
-      <view class="metric">
-        <text class="metric-label">TVOC</text>
-        <text class="metric-value tvoc">{{sen68.tvoc || '--'}}<text class="metric-unit">ppb</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">NOx</text>
-        <text class="metric-value gas">{{sen68.nox || '--'}}<text class="metric-unit">µg/m³</text></text>
-      </view>
-      <view class="metric">
-        <text class="metric-label">HCHO</text>
-        <text class="metric-value hcho">{{sen68.hcho || '--'}}<text class="metric-unit">µg/m³</text></text>
+    <view class="grid {{row.cols === 2 ? 'grid-2' : 'grid-3'}}" wx:for="{{item.rows}}" wx:for-item="row" wx:key="rowKey">
+      <view class="metric" wx:for="{{row.metrics}}" wx:for-item="m" wx:key="key">
+        <text class="metric-label">{{m.label}}</text>
+        <text class="metric-value {{m.cssClass}}">{{m.value}}<text class="metric-unit">{{m.unit}}</text></text>
       </view>
     </view>
   </view>
 
   <view class="footer">
-    <text class="footer-text">ESP32 Environment Monitor v1.2.0</text>
+    <text class="footer-text">ESP32 Sensor Comparison v1.3.0</text>
   </view>
 </view>
