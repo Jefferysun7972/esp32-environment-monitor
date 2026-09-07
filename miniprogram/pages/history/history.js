@@ -68,7 +68,7 @@ Page({
 
   onShow() {
     if (this.data.chartData) {
-      this.drawChart();
+      setTimeout(() => this.drawChart(), 100);
     }
   },
 
@@ -132,7 +132,7 @@ Page({
       };
 
       this.setData({ chartData: rounded, tableData, stats, loading: false }, () => {
-        setTimeout(() => this.drawChart(), 200);
+        setTimeout(() => this.drawChart(), 100);
         if (callback) callback();
       });
     });
@@ -147,7 +147,7 @@ Page({
       .fields({ node: true, size: true })
       .exec((res) => {
         if (!res || !res[0] || !res[0].node) {
-          setTimeout(() => this.drawChart(), 300);
+          setTimeout(() => this.drawChart(touchPoint), 100);
           return;
         }
         const canvas = res[0].node;
