@@ -29,6 +29,14 @@
 - **Grafana Visualization**: Rich dashboards with multi-sensor comparison, correlation charts, and alerts
 - **Data Architecture**: `ESP32 → MQTT → EMQX Cloud` + `ESP32 → HTTP → InfluxDB Cloud → Grafana Cloud`
 
+### 📱 WeChat Mini Program
+- **Real-time Dashboard**: Live sensor data from InfluxDB with auto-refresh
+- **Historical Charts**: 1h / 6h / 24h time-range history curves with dual-sensor comparison
+- **Multi-Metric Support**: Temperature, Humidity, PM1.0, PM2.5, PM10, TVOC, HCHO, NO₂, NOx
+- **Data Table**: Time-grouped detail view showing both sensors side by side
+- **Canvas 2D Rendering**: Hardware-accelerated charts with DPR-aware sharp rendering
+- **Segment Control**: Toggle between metrics and time ranges instantly
+
 ### 🔔 Smart Alert System
 - **3-Color Level**: BLUE (Normal) → ORANGE (Warning) → RED (Danger)
 - **Multi-Parameter Thresholds**: Temp, Humidity, PM1.0, PM2.5, CO2, NOx, TVOC, HCHO
@@ -263,6 +271,68 @@ The system supports multiple display modes selected automatically based on detec
 
 ---
 
+## 📱 WeChat Mini Program Setup
+
+### Prerequisites
+- [WeChat Developer Tools](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)
+- WeChat Mini Program AppID (register at [mp.weixin.qq.com](https://mp.weixin.qq.com))
+- InfluxDB Cloud account (same as ESP32's bucket)
+
+### Project Structure
+```
+miniprogram/
+├── app.js              # App entry, InfluxDB API client
+├── app.json            # Page routes & tab bar config
+├── app.wxss            # Global styles
+├── pages/
+│   ├── index/          # Real-time dashboard
+│   │   ├── index.js
+│   │   ├── index.wxml
+│   │   └── index.wxss
+│   └── history/        # Historical charts
+│       ├── history.js
+│       ├── history.wxml
+│       └── history.wxss
+└── utils/
+```
+
+### Configuration
+1. Open `miniprogram/app.js` and update the InfluxDB credentials:
+```javascript
+const INFLUXDB_URL = 'https://your-region.cloud2.influxdata.com';
+const INFLUXDB_ORG = 'your_org';
+const INFLUXDB_BUCKET = 'sensor_data';
+const INFLUXDB_TOKEN = 'your_api_token';
+```
+
+2. Open the project in WeChat Developer Tools
+3. Replace the AppID in `project.config.json` with your own
+4. Click "Preview" to test on your phone
+
+### Pages
+| Page | Route | Description |
+|------|-------|-------------|
+| **实时数据** | `pages/index/index` | Latest readings from both sensors, auto-refresh |
+| **历史曲线** | `pages/history/history` | Time-series charts with metric/time-range selectors |
+
+### Historical Chart Features
+- **Time Ranges**: 1 hour / 6 hours / 24 hours (InfluxDB aggregateWindow)
+- **Metrics**: Temperature, Humidity, PM1.0, PM2.5, PM10, TVOC, HCHO, NO₂, NOx
+- **Dual Curves**: AM2020DY (solid) vs SEN68 (dashed), with legend showing data point counts
+- **Y-axis Unit Labels**: Auto-appended units (°C, %, µg/m³, ppb)
+- **Data Table**: Grouped by time, showing both sensors' values per row
+
+### Upcoming (v1.3.0)
+- Statistical summary (min / max / average)
+- Touch tooltip with crosshair
+- Threshold reference lines
+- CSV data export
+- Bezier curve smoothing
+- Pull-to-refresh
+- Toggleable legend
+
+---
+
 ## 🗺️ Roadmap
 
 ### v1.0.0 ✅
@@ -271,8 +341,11 @@ The system supports multiple display modes selected automatically based on detec
 ### v1.1.0 ✅
 - WiFi connectivity, MQTT cloud upload (EMQX Cloud), InfluxDB time-series storage, Grafana visualization dashboards
 
-### v1.2.0 (Planned)
-- OTA firmware updates, web configuration portal, sensor calibration tools
+### v1.2.0 ✅
+- WeChat Mini Program: real-time dashboard, historical charts, dual-sensor comparison, Canvas 2D rendering
+
+### v1.3.0 (Planned)
+- Statistical summary, touch tooltip, threshold reference lines, CSV export, curve smoothing, pull-to-refresh, toggleable legend
 
 ---
 
