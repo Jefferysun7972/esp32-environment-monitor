@@ -4,7 +4,7 @@
     "pages/history/history"
   ],
   "window": {
-    "navigationBarTitleText": "环境监测",
+    "navigationBarTitleText": "传感器对比测试",
     "navigationBarBackgroundColor": "#1a73e8",
     "navigationBarTextStyle": "white"
   },

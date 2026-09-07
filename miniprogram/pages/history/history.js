@@ -222,7 +222,10 @@ Page({
     const ref = am2020.length >= sen68.length ? am2020 : sen68;
     const N = Math.max(ref.length, 1);
 
-    const vals = data.map(d => d.value);
+    const visible = [];
+    if (this.data.showAm2020) visible.push(...am2020);
+    if (this.data.showSen68) visible.push(...sen68);
+    const vals = visible.length > 0 ? visible.map(d => d.value) : data.map(d => d.value);
     let minV = Math.min(...vals), maxV = Math.max(...vals);
     if (minV === maxV) { minV -= 1; maxV += 1; }
     const rng = maxV - minV;

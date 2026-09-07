@@ -2,7 +2,7 @@
   <view class="header">
     <view class="header-bg"></view>
     <view class="header-content">
-      <text class="header-title">环境监测</text>
+      <text class="header-title">传感器对比测试</text>
       <text class="header-subtitle">Environment Monitor</text>
       <view class="status-row">
         <view class="status-dot {{connected ? 'on' : 'off'}}"></view>
