@@ -1,13 +1,40 @@
 const METRICS = [
-  { key: 'temp', label: '温度', unit: '°C', color1: '#ff6d00', color2: '#ffab40' },
-  { key: 'humi', label: '湿度', unit: '%', color1: '#1a73e8', color2: '#64b5f6' },
-  { key: 'pm25', label: 'PM2.5', unit: 'µg/m³', color1: '#6a1b9a', color2: '#ce93d8' },
-  { key: 'pm1', label: 'PM1.0', unit: 'µg/m³', color1: '#7b1fa2', color2: '#ba68c8' },
-  { key: 'pm10', label: 'PM10', unit: 'µg/m³', color1: '#4a148c', color2: '#9c27b0' },
-  { key: 'tvoc', label: 'TVOC', unit: 'ppb', color1: '#c62828', color2: '#ef5350' },
-  { key: 'hcho', label: 'HCHO', unit: 'µg/m³', color1: '#e65100', color2: '#ff9800' },
-  { key: 'no2', label: 'NO₂', unit: 'µg/m³', color1: '#2e7d32', color2: '#66bb6a' },
-  { key: 'nox', label: 'NOx', unit: 'µg/m³', color1: '#1b5e20', color2: '#4caf50' },
+  { key: 'temp', label: '温度', unit: '°C', color1: '#ff6d00', color2: '#ffab40', thresholds: [
+    { value: 26, color: '#ff9800', label: '26°C' },
+    { value: 35, color: '#e53935', label: '35°C' }
+  ]},
+  { key: 'humi', label: '湿度', unit: '%', color1: '#1a73e8', color2: '#64b5f6', thresholds: [
+    { value: 70, color: '#ff9800', label: '70%' },
+    { value: 90, color: '#e53935', label: '90%' }
+  ]},
+  { key: 'pm25', label: 'PM2.5', unit: 'µg/m³', color1: '#6a1b9a', color2: '#ce93d8', thresholds: [
+    { value: 35, color: '#ff9800', label: '35' },
+    { value: 75, color: '#e53935', label: '75' }
+  ]},
+  { key: 'pm1', label: 'PM1.0', unit: 'µg/m³', color1: '#7b1fa2', color2: '#ba68c8', thresholds: [
+    { value: 25, color: '#ff9800', label: '25' },
+    { value: 50, color: '#e53935', label: '50' }
+  ]},
+  { key: 'pm10', label: 'PM10', unit: 'µg/m³', color1: '#4a148c', color2: '#9c27b0', thresholds: [
+    { value: 50, color: '#ff9800', label: '50' },
+    { value: 150, color: '#e53935', label: '150' }
+  ]},
+  { key: 'tvoc', label: 'TVOC', unit: 'ppb', color1: '#c62828', color2: '#ef5350', thresholds: [
+    { value: 500, color: '#ff9800', label: '500' },
+    { value: 1000, color: '#e53935', label: '1000' }
+  ]},
+  { key: 'hcho', label: 'HCHO', unit: 'µg/m³', color1: '#e65100', color2: '#ff9800', thresholds: [
+    { value: 100, color: '#ff9800', label: '100' },
+    { value: 200, color: '#e53935', label: '200' }
+  ]},
+  { key: 'no2', label: 'NO₂', unit: 'µg/m³', color1: '#2e7d32', color2: '#66bb6a', thresholds: [
+    { value: 100, color: '#ff9800', label: '100' },
+    { value: 200, color: '#e53935', label: '200' }
+  ]},
+  { key: 'nox', label: 'NOx', unit: 'µg/m³', color1: '#1b5e20', color2: '#4caf50', thresholds: [
+    { value: 100, color: '#ff9800', label: '100' },
+    { value: 200, color: '#e53935', label: '200' }
+  ]},
 ];
 
 const RANGES = [
@@ -214,7 +241,28 @@ Page({
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(metric.unit, pad.l - 6, pad.t - 4);
+    ctx.fillText(metric.unit, pad.l - 6, pad.t - 10);
+
+    // Threshold lines
+    if (metric.thresholds) {
+      metric.thresholds.forEach(t => {
+        if (t.value < minV || t.value > maxV) return;
+        const ty = sy(t.value);
+        ctx.strokeStyle = t.color;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(pad.l, ty);
+        ctx.lineTo(pad.l + pw, ty);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = t.color;
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(t.label, pad.l + pw + 4, ty);
+      });
+    }
 
     // X-axis labels
     const isLongRange = this.data.selectedRange === '24h';
