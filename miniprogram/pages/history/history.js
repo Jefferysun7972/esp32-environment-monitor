@@ -159,7 +159,7 @@ Page({
   },
 
   renderChart(ctx, data, W, H, touchPoint) {
-    const pad = { t: 20, r: 12, b: 38, l: 44 };
+    const pad = { t: 20, r: 12, b: 38, l: 52 };
     const pw = W - pad.l - pad.r;
     const ph = H - pad.t - pad.b;
 
@@ -196,9 +196,7 @@ Page({
     ctx.strokeStyle = '#e8e8e8';
     ctx.lineWidth = 0.5;
     ctx.fillStyle = '#999';
-    ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
     for (let i = 0; i <= 4; i++) {
       const v = minV + (maxV - minV) * (i / 4);
       const y = sy(v);
@@ -206,7 +204,12 @@ Page({
       ctx.moveTo(pad.l, y);
       ctx.lineTo(pad.l + pw, y);
       ctx.stroke();
-      ctx.fillText(v.toFixed(1) + metric.unit, pad.l - 6, y);
+      ctx.font = '10px sans-serif';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(v.toFixed(1), pad.l - 6, y - 2);
+      ctx.font = '8px sans-serif';
+      ctx.textBaseline = 'top';
+      ctx.fillText(metric.unit, pad.l - 6, y + 2);
     }
 
     // X-axis labels
