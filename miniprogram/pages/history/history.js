@@ -25,6 +25,7 @@ Page({
     loading: false,
     chartData: null,
     tableData: null,
+    stats: null,
     canvasWidth: 0,
     canvasHeight: 220
   },
@@ -77,7 +78,23 @@ Page({
       });
       const tableData = Object.values(groupMap);
 
-      this.setData({ chartData: rounded, tableData, loading: false }, () => {
+      // Compute stats per sensor
+      const am2020Vals = rounded.filter(d => d.sensor === 'am2020dy').map(d => d.value);
+      const sen68Vals = rounded.filter(d => d.sensor === 'SEN68').map(d => d.value);
+      const calcStats = (vals) => {
+        if (vals.length === 0) return { min: '-', max: '-', avg: '-' };
+        const min = Math.min(...vals);
+        const max = Math.max(...vals);
+        const sum = vals.reduce((a, b) => a + b, 0);
+        const avg = sum / vals.length;
+        return { min: min.toFixed(1), max: max.toFixed(1), avg: avg.toFixed(1) };
+      };
+      const stats = {
+        am2020dy: calcStats(am2020Vals),
+        sen68: calcStats(sen68Vals)
+      };
+
+      this.setData({ chartData: rounded, tableData, stats, loading: false }, () => {
         setTimeout(() => this.drawChart(), 200);
       });
     });

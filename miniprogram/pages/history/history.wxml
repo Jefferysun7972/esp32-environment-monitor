@@ -39,8 +39,49 @@
     </view>
   </view>
 
+  <view class="stats-bar" wx:if="{{stats}}">
+    <view class="section-title">统计摘要</view>
+    <view class="stats-grid">
+      <view class="stats-card">
+        <text class="stats-sensor">AM2020DY</text>
+        <view class="stats-row">
+          <view class="stats-item">
+            <text class="stats-label">最小</text>
+            <text class="stats-value min">{{stats.am2020dy.min}}</text>
+          </view>
+          <view class="stats-item">
+            <text class="stats-label">最大</text>
+            <text class="stats-value max">{{stats.am2020dy.max}}</text>
+          </view>
+          <view class="stats-item">
+            <text class="stats-label">平均</text>
+            <text class="stats-value avg">{{stats.am2020dy.avg}}</text>
+          </view>
+        </view>
+      </view>
+      <view class="stats-card">
+        <text class="stats-sensor">SEN68</text>
+        <view class="stats-row">
+          <view class="stats-item">
+            <text class="stats-label">最小</text>
+            <text class="stats-value min">{{stats.sen68.min}}</text>
+          </view>
+          <view class="stats-item">
+            <text class="stats-label">最大</text>
+            <text class="stats-value max">{{stats.sen68.max}}</text>
+          </view>
+          <view class="stats-item">
+            <text class="stats-label">平均</text>
+            <text class="stats-value avg">{{stats.sen68.avg}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   <view class="data-table" wx:if="{{tableData && tableData.length > 0}}">
     <view class="section-title">数据明细</view>
+
     <view class="table-header">
       <text class="col-time">时间</text>
       <text class="col-val">AM2020DY</text>
