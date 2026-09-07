@@ -372,7 +372,8 @@ Page({
       lines.forEach((line, i) => {
         ctx.fillText(line, bx + 10, by + 8 + i * fontH);
       });
-    });
+    }
+  },
 
   onExportCsv() {
     const { tableData, selectedMetric } = this.data;
