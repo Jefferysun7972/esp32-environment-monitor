@@ -159,7 +159,7 @@ Page({
   },
 
   renderChart(ctx, data, W, H, touchPoint) {
-    const pad = { t: 20, r: 12, b: 38, l: 52 };
+    const pad = { t: 20, r: 12, b: 38, l: 44 };
     const pw = W - pad.l - pad.r;
     const ph = H - pad.t - pad.b;
 
@@ -196,7 +196,9 @@ Page({
     ctx.strokeStyle = '#e8e8e8';
     ctx.lineWidth = 0.5;
     ctx.fillStyle = '#999';
+    ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
     for (let i = 0; i <= 4; i++) {
       const v = minV + (maxV - minV) * (i / 4);
       const y = sy(v);
@@ -204,13 +206,15 @@ Page({
       ctx.moveTo(pad.l, y);
       ctx.lineTo(pad.l + pw, y);
       ctx.stroke();
-      ctx.font = '10px sans-serif';
-      ctx.textBaseline = 'bottom';
-      ctx.fillText(v.toFixed(1), pad.l - 6, y - 2);
-      ctx.font = '8px sans-serif';
-      ctx.textBaseline = 'top';
-      ctx.fillText(metric.unit, pad.l - 6, y + 2);
+      ctx.fillText(v.toFixed(1), pad.l - 6, y);
     }
+
+    // Unit label at top of Y-axis
+    ctx.fillStyle = '#999';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(metric.unit, pad.l - 6, pad.t - 4);
 
     // X-axis labels
     const isLongRange = this.data.selectedRange === '24h';
@@ -254,17 +258,18 @@ Page({
     drawSeries(sen68, metric.color2);
 
     // Legend with counts
+    const legX = pad.l + pw - 195;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = metric.color1;
-    ctx.fillRect(pad.l, 8, 14, 10);
+    ctx.fillRect(legX, 8, 14, 10);
     ctx.fillStyle = '#333';
-    ctx.fillText('AM2020DY(' + am2020.length + ')', pad.l + 18, 8);
+    ctx.fillText('AM2020DY(' + am2020.length + ')', legX + 18, 8);
     ctx.fillStyle = metric.color2;
-    ctx.fillRect(pad.l + 120, 8, 14, 10);
+    ctx.fillRect(legX + 120, 8, 14, 10);
     ctx.fillStyle = '#333';
-    ctx.fillText('SEN68(' + sen68.length + ')', pad.l + 138, 8);
+    ctx.fillText('SEN68(' + sen68.length + ')', legX + 138, 8);
 
     // Save metadata for touch handler
     this._chartMeta = { am2020, sen68, ref, N, pad, sx, sy, pw, ph, metric };
