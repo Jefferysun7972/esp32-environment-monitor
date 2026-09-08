@@ -1,4 +1,4 @@
-const { SENSORS, FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS } = require('../../config/sensors');
+const { SENSORS, FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS, ALL_FIELDS } = require('../../config/sensors');
 
 Page({
   data: {
@@ -39,7 +39,7 @@ Page({
   _buildCards(sensorData) {
     const cards = SENSORS.map(s => {
       const data = sensorData[s.id] || {};
-      const allMetrics = s.fields.map(f => ({
+      const allMetrics = ALL_FIELDS.map(f => ({
         key: f,
         label: FIELD_LABELS[f] || f,
         unit: FIELD_UNITS[f] || '',
@@ -47,19 +47,17 @@ Page({
         value: data[f] !== undefined && data[f] !== null && !isNaN(data[f]) ? data[f] : '--'
       }));
 
-      // Split metrics into rows according to rowLayout
       const rows = [];
-      let cursor = 0;
-      (s.rowLayout || [s.fields.length]).forEach((cols, idx) => {
+      const perRow = 3;
+      for (let i = 0; i < allMetrics.length; i += perRow) {
         rows.push({
-          cols: cols,
-          metrics: allMetrics.slice(cursor, cursor + cols),
-          rowKey: 'row' + idx
+          cols: perRow,
+          metrics: allMetrics.slice(i, i + perRow),
+          rowKey: 'row' + Math.floor(i / perRow)
         });
-        cursor += cols;
-      });
+      }
 
-      return { ...s, rows };
+      return { ...s, rows, paramCount: ALL_FIELDS.length };
     });
     this.setData({ sensorCards: cards });
   },

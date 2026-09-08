@@ -87,16 +87,24 @@ Page({
   },
 
   _buildMetrics() {
-    const allFields = new Set();
-    SENSORS.forEach(s => s.fields.forEach(f => allFields.add(f)));
-    const metrics = METRICS.map(m => ({
-      ...m,
-      supported: allFields.has(m.key)
-    }));
+    const app = getApp();
+    const sensorData = app.globalData.sensorData || {};
+    const metrics = METRICS.map(m => {
+      // 数据驱动：检查是否有传感器实际上报了该字段的数据
+      let supported = false;
+      for (const sid in sensorData) {
+        if (sensorData[sid][m.key] !== undefined && sensorData[sid][m.key] !== null && !isNaN(sensorData[sid][m.key])) {
+          supported = true;
+          break;
+        }
+      }
+      return { ...m, supported };
+    });
     this.setData({ metrics });
   },
 
   onShow() {
+    this._buildMetrics();
     if (this.data.chartData) {
       setTimeout(() => this.drawChart(), 50);
     }

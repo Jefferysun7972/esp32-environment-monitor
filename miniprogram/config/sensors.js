@@ -50,10 +50,7 @@ const SENSORS = [
     measurement: 'am2020dy',
     label: 'AM2020DY',
     shortLabel: 'AM',
-    description: '8-in-1 Sensor Module',
-    paramCount: 8,
-    fields: ['temp', 'humi', 'pm1', 'pm25', 'pm10', 'tvoc', 'no2', 'hcho'],
-    rowLayout: [2, 3, 3],
+    description: 'Sensor Module',
     color: '#ff6d00',
     colorLight: '#ffab40',
     iconBg: '#fff3e0',
@@ -64,10 +61,7 @@ const SENSORS = [
     measurement: 'SEN68',
     label: 'SEN68',
     shortLabel: 'S6',
-    description: '8-in-1 Sensor Module',
-    paramCount: 8,
-    fields: ['temp', 'humi', 'pm1', 'pm25', 'pm10', 'tvoc', 'nox', 'hcho'],
-    rowLayout: [2, 3, 3],
+    description: 'Sensor Module',
     color: '#1a73e8',
     colorLight: '#64b5f6',
     iconBg: '#e3f2fd',
@@ -75,8 +69,8 @@ const SENSORS = [
   }
 ];
 
-// 所有传感器支持的字段并集
-const ALL_FIELDS = [...new Set(SENSORS.flatMap(s => s.fields))];
+// 所有已知字段（从 FIELD_LABELS 自动生成，添加新字段只需改 FIELD_LABELS）
+const ALL_FIELDS = Object.keys(FIELD_LABELS);
 
 module.exports = {
   SENSORS,
