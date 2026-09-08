@@ -385,3 +385,84 @@
   border-radius: 20rpx;
   background: #1a73e8;
 }
+
+/* Dark Mode */
+.theme-dark .container {
+  background: #1a1a2e;
+}
+
+.theme-dark .controls {
+  background: #252540;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.3);
+}
+
+.theme-dark .section-title {
+  color: #aaa;
+}
+
+.theme-dark .chip {
+  background: #2a2a45;
+  color: #aaa;
+  border-color: #444;
+}
+
+.theme-dark .chip.active {
+  background: #1a73e8;
+  color: #fff;
+  border-color: #1a73e8;
+}
+
+.theme-dark .stats-grid {
+  background: #252540;
+}
+
+.theme-dark .stat-label {
+  color: #888;
+}
+
+.theme-dark .stat-value {
+  color: #e0e0e0;
+}
+
+.theme-dark .stat-unit {
+  color: #777;
+}
+
+.theme-dark .table-header {
+  background: #2a2a45;
+}
+
+.theme-dark .table-header-cell {
+  color: #aaa;
+  border-color: #333;
+}
+
+.theme-dark .table-cell {
+  color: #ccc;
+  border-color: #333;
+}
+
+.theme-dark .table-row {
+  background: #252540;
+}
+
+.theme-dark .zoom-hint {
+  color: #777;
+}
+
+.theme-dark .export-modal-mask {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.theme-dark .export-modal {
+  background: #252540;
+}
+
+.theme-dark .export-modal-title {
+  color: #e0e0e0;
+}
+
+.theme-dark .export-btn-cancel {
+  background: #333;
+  color: #aaa;
+}

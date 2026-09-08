@@ -43,7 +43,8 @@ Page({
     exportModalOpen: false,
     exportMetrics: [],
     exportRange: '1h',
-    exporting: false
+    exporting: false,
+    pageTheme: 'light'
   },
 
   _getSensors() {
@@ -106,10 +107,12 @@ Page({
   },
 
   onShow() {
+    const app = getApp();
     const sensors = this._getSensors();
     if (sensors.length > 0 && this.data.sensors.length !== sensors.length) {
       this.setData({ sensors, showSensor: sensors.map(() => true) });
     }
+    this.setData({ pageTheme: app.getTheme() });
     this._buildMetrics();
     if (this.data.chartData) {
       setTimeout(() => this.drawChart(), 50);
@@ -768,5 +771,12 @@ Page({
         wx.showToast({ title: '导出失败: ' + (err.errMsg || ''), icon: 'none' });
       }
     });
+  },
+
+  onShareAppMessage() {
+    return {
+      title: '传感器对比测试 - 历史曲线分析',
+      path: '/pages/history/history'
+    };
   }
 });

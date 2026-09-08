@@ -11,7 +11,9 @@ App({
     sensorData: {},
     connected: false,
     lastUpdate: '',
-    dataCached: false
+    dataCached: false,
+    theme: 'light',
+    isFahrenheit: false
   },
 
   _sensors() {
@@ -33,6 +35,7 @@ App({
 
   onLaunch() {
     this._loadCache();
+    this._loadSettings();
     this.discoverSensors(() => {
       this.fetchData();
       setInterval(() => this.fetchData(), REFRESH_INTERVAL);
@@ -61,6 +64,44 @@ App({
       });
       this.globalData.dataCached = false;
     } catch (e) {}
+  },
+
+  _loadSettings() {
+    try {
+      const settings = wx.getStorageSync('app_settings');
+      if (settings) {
+        if (settings.theme) this.globalData.theme = settings.theme;
+        if (settings.isFahrenheit !== undefined) this.globalData.isFahrenheit = settings.isFahrenheit;
+      }
+    } catch (e) {}
+  },
+
+  _saveSettings() {
+    try {
+      wx.setStorageSync('app_settings', {
+        theme: this.globalData.theme,
+        isFahrenheit: this.globalData.isFahrenheit
+      });
+    } catch (e) {}
+  },
+
+  setTheme(theme) {
+    this.globalData.theme = theme;
+    this._saveSettings();
+    this.notifyPages();
+  },
+
+  getTheme() {
+    return this.globalData.theme;
+  },
+
+  setTempUnit(isFahrenheit) {
+    this.globalData.isFahrenheit = isFahrenheit;
+    this._saveSettings();
+  },
+
+  getTempUnit() {
+    return this.globalData.isFahrenheit;
   },
 
   _queryInfluxDB(query, timeout, callback) {

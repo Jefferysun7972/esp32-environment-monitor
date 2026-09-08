@@ -8,7 +8,8 @@ Page({
     connected: false,
     lastUpdate: '',
     dataCached: false,
-    isFahrenheit: false
+    isFahrenheit: false,
+    pageTheme: 'light'
   },
 
   _getSensors() {
@@ -59,7 +60,9 @@ Page({
       sensorData: app.globalData.sensorData,
       connected: app.globalData.connected,
       lastUpdate: app.globalData.lastUpdate || '',
-      dataCached: app.globalData.dataCached || false
+      dataCached: app.globalData.dataCached || false,
+      isFahrenheit: app.getTempUnit(),
+      pageTheme: app.getTheme()
     });
     this._buildCards(app.globalData.sensorData, filters);
   },
@@ -82,7 +85,7 @@ Page({
         }
         let displayVal = val !== null ? val : '--';
         let displayUnit = FIELD_UNITS[f] || '';
-        if (f === 'temp' && val !== null && this.data.isFahrenheit) {
+        if (f === 'temp' && val !== null && app.getTempUnit()) {
           displayVal = (val * 9 / 5 + 32).toFixed(1);
           displayUnit = '°F';
         }
@@ -134,8 +137,17 @@ Page({
   },
 
   onTempUnitToggle() {
-    const isFahrenheit = !this.data.isFahrenheit;
+    const app = getApp();
+    const isFahrenheit = !app.getTempUnit();
+    app.setTempUnit(isFahrenheit);
     this.setData({ isFahrenheit });
     this._buildCards(this.data.sensorData, this.data.sensorFilters);
+  },
+
+  onShareAppMessage() {
+    return {
+      title: '传感器对比测试 - 实时环境监测',
+      path: '/pages/index/index'
+    };
   }
 });

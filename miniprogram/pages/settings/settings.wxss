@@ -1,0 +1,83 @@
+.container {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 24rpx;
+}
+
+.container.theme-dark {
+  background: #1a1a2e;
+}
+
+.section {
+  background: #fff;
+  border-radius: 16rpx;
+  margin-bottom: 24rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+.container.theme-dark .section {
+  background: #252540;
+  box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.3);
+}
+
+.section-title {
+  font-size: 24rpx;
+  color: #999;
+  padding: 20rpx 24rpx 12rpx;
+}
+
+.container.theme-dark .section-title {
+  color: #777;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx;
+  border-bottom: 1rpx solid #f0f0f0;
+}
+
+.container.theme-dark .setting-item {
+  border-bottom-color: #333;
+}
+
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-info {
+  flex: 1;
+}
+
+.setting-label {
+  font-size: 30rpx;
+  color: #333;
+  display: block;
+}
+
+.container.theme-dark .setting-label {
+  color: #e0e0e0;
+}
+
+.setting-desc {
+  font-size: 24rpx;
+  color: #999;
+  margin-top: 4rpx;
+  display: block;
+}
+
+.container.theme-dark .setting-desc {
+  color: #777;
+}
+
+.setting-arrow {
+  font-size: 36rpx;
+  color: #ccc;
+  margin-left: 12rpx;
+}
+
+.container.theme-dark .setting-arrow {
+  color: #555;
+}

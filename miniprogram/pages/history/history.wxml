@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container {{pageTheme === 'dark' ? 'theme-dark' : ''}}">
   <view class="controls">
     <view class="section-title">时间范围</view>
     <view class="chip-row wrap">

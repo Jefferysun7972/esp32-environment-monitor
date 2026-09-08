@@ -1,4 +1,4 @@
-<view class="container">
+<view class="container {{pageTheme === 'dark' ? 'theme-dark' : ''}}">
   <view class="header">
     <view class="header-bg"></view>
     <view class="header-content">

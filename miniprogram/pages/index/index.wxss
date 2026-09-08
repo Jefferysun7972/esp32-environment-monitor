@@ -310,3 +310,73 @@
   font-size: 22rpx;
   color: #bbb;
 }
+
+/* Dark Mode */
+.theme-dark .container {
+  background: linear-gradient(180deg, #16213e 0%, #1a1a2e 30%);
+}
+
+.theme-dark .header-bg {
+  background: linear-gradient(135deg, #0d47a1 0%, #0a0a1a 100%);
+}
+
+.theme-dark .header-title,
+.theme-dark .header-subtitle {
+  color: #e0e0e0;
+}
+
+.theme-dark .status-text {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.theme-dark .card {
+  background: #252540;
+  box-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.3);
+}
+
+.theme-dark .card-header {
+  border-bottom-color: #333;
+  color: #e0e0e0;
+}
+
+.theme-dark .card-sensor-name {
+  color: #e0e0e0;
+}
+
+.theme-dark .card-sensor-desc {
+  color: #888;
+}
+
+.theme-dark .metric {
+  background: #2a2a45;
+  border-color: #333;
+}
+
+.theme-dark .metric-label {
+  color: #aaa;
+}
+
+.theme-dark .metric-value {
+  color: #e0e0e0;
+}
+
+.theme-dark .metric-unit {
+  color: #888;
+}
+
+.theme-dark .grid {
+  border-top-color: #333;
+}
+
+.theme-dark .footer-text {
+  color: #666;
+}
+
+.theme-dark .pull-hint-text {
+  color: #888;
+}
+
+.theme-dark .filter-chip {
+  background: #2a2a45;
+  color: #aaa;
+}

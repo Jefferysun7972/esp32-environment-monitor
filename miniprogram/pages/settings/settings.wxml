@@ -1,0 +1,40 @@
+<view class="container {{pageTheme === 'dark' ? 'theme-dark' : ''}}">
+  <view class="section">
+    <view class="section-title">外观</view>
+    <view class="setting-item">
+      <view class="setting-info">
+        <text class="setting-label">深色模式</text>
+        <text class="setting-desc">切换深色/浅色主题</text>
+      </view>
+      <switch checked="{{theme === 'dark'}}" bindchange="onThemeChange" color="#1a73e8"/>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">单位</view>
+    <view class="setting-item">
+      <view class="setting-info">
+        <text class="setting-label">华氏度 (°F)</text>
+        <text class="setting-desc">温度显示切换为华氏度</text>
+      </view>
+      <switch checked="{{isFahrenheit}}" bindchange="onTempUnitChange" color="#1a73e8"/>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">关于</view>
+    <view class="setting-item">
+      <view class="setting-info">
+        <text class="setting-label">传感器对比测试</text>
+        <text class="setting-desc">版本 1.3.0 · 全自动传感器发现</text>
+      </view>
+    </view>
+    <view class="setting-item" bindtap="onShareAppMessage">
+      <view class="setting-info">
+        <text class="setting-label">分享给朋友</text>
+        <text class="setting-desc">邀请朋友查看传感器数据</text>
+      </view>
+      <text class="setting-arrow">›</text>
+    </view>
+  </view>
+</view>
