@@ -43,6 +43,7 @@ App({
     try {
       const cache = wx.getStorageSync('sensor_cache');
       if (cache && cache.sensorData && cache.lastUpdate) {
+        this.globalData.sensors = cache.sensors || ENV_FALLBACK_SENSORS;
         this.globalData.sensorData = cache.sensorData;
         this.globalData.lastUpdate = cache.lastUpdate + ' (缓存)';
         this.globalData.dataCached = true;
@@ -53,6 +54,7 @@ App({
   _saveCache() {
     try {
       wx.setStorageSync('sensor_cache', {
+        sensors: this.globalData.sensors,
         sensorData: this.globalData.sensorData,
         lastUpdate: this.globalData.lastUpdate,
         timestamp: Date.now()
@@ -61,56 +63,63 @@ App({
     } catch (e) {}
   },
 
-  discoverSensors(callback) {
-    const query = `import "influxdata/influxdb/schema"
-schema.measurements(bucket: "sensor_data")`;
-
+  _queryInfluxDB(query, timeout, callback) {
     wx.request({
       url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
       method: 'POST',
-      timeout: 10000,
+      timeout: timeout,
       header: {
         'Authorization': 'Token ' + INFLUXDB_TOKEN,
         'Content-Type': 'application/vnd.flux',
         'Accept': 'application/csv'
       },
       data: query,
-      success: (res) => {
-        if (res.statusCode === 200) {
-          const measurements = this._parseMeasurementsCSV(res.data);
-          if (measurements.length > 0) {
-            const sensors = measurements.map((m, i) => {
-              const colors = SENSOR_COLORS[i % SENSOR_COLORS.length];
-              return {
-                id: m,
-                measurement: m,
-                label: m,
-                shortLabel: m.substring(0, 2).toUpperCase(),
-                description: 'Sensor Module',
-                ...colors
-              };
-            });
-            this.globalData.sensors = sensors;
-            this.globalData.sensorData = Object.fromEntries(sensors.map(s => [s.id, {}]));
-            console.log('[discover] 发现', sensors.length, '个传感器:', measurements.join(', '));
-            callback();
-            return;
-          }
+      success: (res) => callback(null, res),
+      fail: (err) => callback(err, null)
+    });
+  },
+
+  discoverSensors(callback) {
+    const query = `import "influxdata/influxdb/schema"
+schema.measurements(bucket: "sensor_data")`;
+
+    this._queryInfluxDB(query, 10000, (err, res) => {
+      if (!err && res && res.statusCode === 200) {
+        const measurements = this._parseMeasurementsCSV(res.data);
+        if (measurements.length > 0) {
+          const sensors = measurements.map((m, i) => {
+            const colors = SENSOR_COLORS[i % SENSOR_COLORS.length];
+            return {
+              id: m,
+              measurement: m,
+              label: m,
+              shortLabel: m.substring(0, 2).toUpperCase(),
+              description: 'Sensor Module',
+              ...colors
+            };
+          });
+          this.globalData.sensors = sensors;
+          this.globalData.sensorData = Object.fromEntries(sensors.map(s => [s.id, {}]));
+          console.log('[discover] 发现', sensors.length, '个传感器:', measurements.join(', '));
+          callback();
+          return;
         }
-        this._fallbackSensors();
-        callback();
-      },
-      fail: () => {
-        this._fallbackSensors();
-        callback();
       }
+      this._fallbackSensors();
+      callback();
     });
   },
 
   _fallbackSensors() {
     console.warn('[discover] 自动发现失败，使用兜底传感器列表');
-    this.globalData.sensors = ENV_FALLBACK_SENSORS;
-    this.globalData.sensorData = Object.fromEntries(ENV_FALLBACK_SENSORS.map(s => [s.id, {}]));
+    if (this.globalData.sensors.length === 0) {
+      this.globalData.sensors = ENV_FALLBACK_SENSORS;
+    }
+    if (Object.keys(this.globalData.sensorData).length === 0) {
+      this.globalData.sensorData = Object.fromEntries(
+        this.globalData.sensors.map(s => [s.id, {}])
+      );
+    }
   },
 
   _parseMeasurementsCSV(csv) {
@@ -140,54 +149,37 @@ schema.measurements(bucket: "sensor_data")`;
   |> filter(fn: (r) => r._measurement == "${measurement}")
   |> aggregateWindow(every: 5m, fn: last, createEmpty: false)`;
 
-      wx.request({
-        url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
-        method: 'POST',
-        timeout: 15000,
-        header: {
-          'Authorization': 'Token ' + INFLUXDB_TOKEN,
-          'Content-Type': 'application/vnd.flux',
-          'Accept': 'application/csv'
-        },
-        data: query,
-        success: (res) => {
-          if (res.statusCode === 200) {
-            const parsed = this.parseCSV(res.data);
-            if (parsed.length > 0) {
-              successCount++;
-              const sensor = sensors.find(s => s.measurement === measurement);
-              const key = sensor ? sensor.id : measurement;
-              const entry = this.globalData.sensorData[key] || {};
-              parsed.forEach(row => {
-                entry[row.field] = row.value;
-              });
-              this.globalData.sensorData[key] = entry;
-            } else {
-              console.warn('[fetchData]', measurement, '200 OK 但无数据行');
-              this.globalData._lastError = measurement + ': 无数据（ESP32 可能未上报）';
-            }
+      this._queryInfluxDB(query, 15000, (err, res) => {
+        if (!err && res && res.statusCode === 200) {
+          const parsed = this.parseCSV(res.data);
+          if (parsed.length > 0) {
+            successCount++;
+            const sensor = sensors.find(s => s.measurement === measurement);
+            const key = sensor ? sensor.id : measurement;
+            const entry = this.globalData.sensorData[key] || {};
+            parsed.forEach(row => {
+              entry[row.field] = row.value;
+            });
+            this.globalData.sensorData[key] = entry;
           } else {
-            console.warn('[fetchData]', measurement, 'HTTP', res.statusCode);
-            this.globalData._lastError = measurement + ': HTTP ' + res.statusCode;
+            console.warn('[fetchData]', measurement, '200 OK 但无数据行');
+            this.globalData._lastError = measurement + ': 无数据（ESP32 可能未上报）';
           }
-        },
-        fail: (err) => {
-          const msg = (err && err.errMsg) ? err.errMsg : '请求被拦截或超时';
-          console.error('fetch error for', measurement, err);
+        } else {
+          const msg = err ? (err.errMsg || '网络错误') : ('HTTP ' + (res ? res.statusCode : '?'));
+          console.warn('[fetchData]', measurement, msg);
           this.globalData._lastError = measurement + ': ' + msg;
-        },
-        complete: () => {
-          completed++;
-          if (completed === measurements.length) {
-            this.globalData.connected = successCount > 0;
-            if (successCount > 0) {
-              this.globalData.lastUpdate = new Date().toLocaleTimeString();
-              this._saveCache();
-            }
-            this.notifyPages();
-            if (!this.globalData.connected) {
-              console.warn('[实时数据] 全部请求失败，最后错误:', this.globalData._lastError);
-            }
+        }
+        completed++;
+        if (completed === measurements.length) {
+          this.globalData.connected = successCount > 0;
+          if (successCount > 0) {
+            this.globalData.lastUpdate = new Date().toLocaleTimeString();
+            this._saveCache();
+          }
+          this.notifyPages();
+          if (!this.globalData.connected) {
+            console.warn('[实时数据] 全部请求失败，最后错误:', this.globalData._lastError);
           }
         }
       });
@@ -238,26 +230,12 @@ schema.measurements(bucket: "sensor_data")`;
   |> filter(fn: (r) => r._field == "${field}")
   |> aggregateWindow(every: ${this.getWindow(range)}, fn: mean, createEmpty: false)`;
 
-    wx.request({
-      url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
-      method: 'POST',
-      timeout: 30000,
-      header: {
-        'Authorization': 'Token ' + INFLUXDB_TOKEN,
-        'Content-Type': 'application/vnd.flux',
-        'Accept': 'application/csv'
-      },
-      data: query,
-      success: (res) => {
-        if (res.statusCode === 200) {
-          const data = this.parseTimeCSV(res.data, range);
-          callback(null, data);
-        } else {
-          callback('查询失败: ' + res.statusCode, null);
-        }
-      },
-      fail: (err) => {
-        callback(err.errMsg || '网络错误', null);
+    this._queryInfluxDB(query, 30000, (err, res) => {
+      if (!err && res && res.statusCode === 200) {
+        const data = this.parseTimeCSV(res.data, range);
+        callback(null, data);
+      } else {
+        callback(err ? (err.errMsg || '网络错误') : ('查询失败: ' + (res ? res.statusCode : '?')), null);
       }
     });
   },
