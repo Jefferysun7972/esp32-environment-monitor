@@ -37,6 +37,14 @@ Page({
     const isFahrenheit = e.detail.value;
     app.setTempUnit(isFahrenheit);
     this.setData({ isFahrenheit });
+
+    const pages = getCurrentPages();
+    pages.forEach(p => {
+      if (p.setData && p._buildCards) {
+        p.setData({ isFahrenheit });
+        p._buildCards(p.data.sensorData, p.data.sensorFilters);
+      }
+    });
   },
 
   onShareAppMessage() {

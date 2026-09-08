@@ -29,12 +29,14 @@
         <text class="setting-desc">版本 1.3.0 · 全自动传感器发现</text>
       </view>
     </view>
-    <view class="setting-item" bindtap="onShareAppMessage">
+    <view class="setting-item">
       <view class="setting-info">
         <text class="setting-label">分享给朋友</text>
         <text class="setting-desc">邀请朋友查看传感器数据</text>
       </view>
-      <text class="setting-arrow">›</text>
+      <button class="share-btn" open-type="share" plain="true">
+        <text class="setting-arrow">›</text>
+      </button>
     </view>
   </view>
 </view>

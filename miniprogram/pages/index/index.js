@@ -25,7 +25,9 @@ Page({
         sensorData: data,
         connected: connected,
         lastUpdate: lastUpdate || '',
-        dataCached: app.globalData.dataCached || false
+        dataCached: app.globalData.dataCached || false,
+        isFahrenheit: app.getTempUnit(),
+        pageTheme: app.getTheme()
       });
       this._buildCards(data, this.data.sensorFilters);
     };
