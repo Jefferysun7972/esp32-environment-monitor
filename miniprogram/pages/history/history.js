@@ -37,6 +37,10 @@ const METRICS = [
     { value: 100, color: '#ff9800', label: '100' },
     { value: 200, color: '#e53935', label: '200' }
   ]},
+  { key: 'co2', label: 'CO₂', unit: 'ppm', color1: '#004d40', color2: '#26a69a', thresholds: [
+    { value: 1000, color: '#ff9800', label: '1000' },
+    { value: 2000, color: '#e53935', label: '2000' }
+  ]},
 ];
 
 const RANGES = [
@@ -205,9 +209,7 @@ Page({
 
   drawChart(touchPoint) {
     const data = this.data.chartData;
-    console.log('[drawChart] 调用, chartData 长度:', data ? data.length : 0, 'loading:', this.data.loading);
     if (!data || data.length === 0) {
-      console.warn('[drawChart] 无数据，跳过绘制');
       return;
     }
 
@@ -229,7 +231,6 @@ Page({
         const canvas = res[0].node;
         const W = this.data.canvasWidth;
         const H = this.data.canvasHeight;
-        console.log('[drawChart] Canvas 就绪, 尺寸:', W, 'x', H);
 
         const dpr = wx.getSystemInfoSync().pixelRatio;
 
@@ -256,6 +257,29 @@ Page({
     const touch = e.touches[0];
     if (!touch) return;
 
+    // Throttle: only redraw every 50ms during touch move
+    const now = Date.now();
+    if (e.type === 'touchmove' && this._lastTouchTime && now - this._lastTouchTime < 50) {
+      this._pendingTouch = { e, touch };
+      if (!this._touchTimer) {
+        this._touchTimer = setTimeout(() => {
+          this._touchTimer = null;
+          if (this._pendingTouch) {
+            this._processTouch(this._pendingTouch.e, this._pendingTouch.touch);
+            this._pendingTouch = null;
+          }
+        }, 50);
+      }
+      return;
+    }
+    this._lastTouchTime = now;
+    this._processTouch(e, touch);
+  },
+
+  _processTouch(e, touch) {
+    const meta = this._chartMeta;
+    if (!meta) return;
+
     const x = touch.x;
     const y = touch.y;
 
@@ -278,6 +302,12 @@ Page({
   },
 
   onCanvasTouchEnd(e) {
+    if (this._touchTimer) {
+      clearTimeout(this._touchTimer);
+      this._touchTimer = null;
+    }
+    this._pendingTouch = null;
+    this._lastTouchTime = 0;
     const changedTouches = e.changedTouches;
     if (!changedTouches || changedTouches.length === 0) {
       this.drawChart();

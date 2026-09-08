@@ -1,6 +1,7 @@
 const INFLUXDB_URL = 'https://us-east-1-1.aws.cloud2.influxdata.com';
 const INFLUXDB_ORG = 'Fellowes';
 const INFLUXDB_TOKEN = 'doR-H4EoxcxidC5AYN0NjzYQB7kJ5cusQvXe16b7j1W_tO4ouL35MlFayhPfTlnxR0djAgCwCFfgOVZSCXyzog==';
+const REFRESH_INTERVAL = 20000;
 
 const { SENSORS, ALL_FIELDS } = require('./config/sensors');
 
@@ -11,9 +12,22 @@ App({
     lastUpdate: ''
   },
 
+  _splitCSV(csv) {
+    const allLines = csv.trim().split('\n');
+    if (allLines.length < 2) return [];
+    let headerIdx = 0;
+    for (let i = 0; i < allLines.length; i++) {
+      if (!allLines[i].startsWith('#')) {
+        headerIdx = i;
+        break;
+      }
+    }
+    return allLines.slice(headerIdx);
+  },
+
   onLaunch() {
     this.fetchData();
-    setInterval(() => this.fetchData(), 20000);
+    setInterval(() => this.fetchData(), REFRESH_INTERVAL);
   },
 
   fetchData() {
@@ -83,18 +97,7 @@ App({
   },
 
   parseCSV(csv) {
-    const allLines = csv.trim().split('\n');
-    if (allLines.length < 2) return [];
-
-    // Skip InfluxDB annotation rows (lines starting with #)
-    let headerIdx = 0;
-    for (let i = 0; i < allLines.length; i++) {
-      if (!allLines[i].startsWith('#')) {
-        headerIdx = i;
-        break;
-      }
-    }
-    const lines = allLines.slice(headerIdx);
+    const lines = this._splitCSV(csv);
     if (lines.length < 2) return [];
 
     const headers = lines[0].split(',');
@@ -169,18 +172,7 @@ App({
   },
 
   parseTimeCSV(csv, range) {
-    const allLines = csv.trim().split('\n');
-    if (allLines.length < 2) return [];
-
-    // Skip InfluxDB annotation rows (lines starting with #)
-    let headerIdx = 0;
-    for (let i = 0; i < allLines.length; i++) {
-      if (!allLines[i].startsWith('#')) {
-        headerIdx = i;
-        break;
-      }
-    }
-    const lines = allLines.slice(headerIdx);
+    const lines = this._splitCSV(csv);
     if (lines.length < 2) return [];
 
     const headers = lines[0].split(',');

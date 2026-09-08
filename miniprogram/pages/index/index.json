@@ -1,4 +1,6 @@
 {
   "usingComponents": {},
-  "navigationBarTitleText": "传感器对比测试"
+  "navigationBarTitleText": "传感器对比测试",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

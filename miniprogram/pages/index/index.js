@@ -68,5 +68,11 @@ Page({
     const app = getApp();
     app.fetchData();
     wx.showToast({ title: '刷新中', icon: 'loading', duration: 1000 });
+  },
+
+  onPullDownRefresh() {
+    const app = getApp();
+    app.fetchData();
+    setTimeout(() => wx.stopPullDownRefresh(), 1000);
   }
 });
