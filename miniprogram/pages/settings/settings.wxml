@@ -14,8 +14,8 @@
     <view class="section-title">单位</view>
     <view class="setting-item">
       <view class="setting-info">
-        <text class="setting-label">华氏度 (°F)</text>
-        <text class="setting-desc">温度显示切换为华氏度</text>
+        <text class="setting-label">{{isFahrenheit ? '华氏度 (°F)' : '摄氏度 (°C)'}}</text>
+        <text class="setting-desc">当前温度单位为{{isFahrenheit ? '华氏度' : '摄氏度'}}</text>
       </view>
       <switch checked="{{isFahrenheit}}" bindchange="onTempUnitChange" color="#1a73e8"/>
     </view>
