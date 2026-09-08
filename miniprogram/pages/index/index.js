@@ -1,11 +1,17 @@
-const { SENSORS, FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS } = require('../../config/sensors');
+const { FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS } = require('../../config/sensors');
 
 Page({
   data: {
     sensorData: {},
     sensorCards: [],
+    sensorFilters: [],
     connected: false,
     lastUpdate: ''
+  },
+
+  _getSensors() {
+    const app = getApp();
+    return app._sensors ? app._sensors() : [];
   },
 
   onLoad() {
@@ -16,28 +22,48 @@ Page({
         connected: connected,
         lastUpdate: lastUpdate || ''
       });
-      this._buildCards(data);
+      this._buildCards(data, this.data.sensorFilters);
     };
 
-    this.setData({
-      sensorData: app.globalData.sensorData,
-      connected: app.globalData.connected
-    });
-    this._buildCards(app.globalData.sensorData);
+    const sensors = this._getSensors();
+    const filters = sensors.map(s => ({
+      id: s.id,
+      label: s.label,
+      displayLabel: s.label.length > 5 ? s.label.substring(0, 5) + '…' : s.label,
+      color: s.color,
+      active: true
+    }));
+
+    this.setData({ sensorFilters: filters });
+    this._buildCards(app.globalData.sensorData, filters);
   },
 
   onShow() {
     const app = getApp();
+    const sensors = this._getSensors();
+    const filters = (this.data.sensorFilters.length === sensors.length && sensors.length > 0)
+      ? this.data.sensorFilters
+      : sensors.map(s => ({
+        id: s.id, label: s.label,
+        displayLabel: s.label.length > 5 ? s.label.substring(0, 5) + '…' : s.label,
+        color: s.color, active: true
+      }));
+    if (this.data.sensorFilters.length !== sensors.length) {
+      this.setData({ sensorFilters: filters });
+    }
     this.setData({
       sensorData: app.globalData.sensorData,
       connected: app.globalData.connected,
       lastUpdate: app.globalData.lastUpdate || ''
     });
-    this._buildCards(app.globalData.sensorData);
+    this._buildCards(app.globalData.sensorData, filters);
   },
 
-  _buildCards(sensorData) {
-    const cards = SENSORS.map(s => {
+  _buildCards(sensorData, sensorFilters) {
+    const sensors = this._getSensors();
+    const filters = sensorFilters || this.data.sensorFilters || [];
+    const activeSet = new Set(filters.filter(f => f.active).map(f => f.id));
+    const cards = sensors.map(s => {
       const data = sensorData[s.id] || {};
       const fields = Object.keys(data);
       const allMetrics = fields.map(f => ({
@@ -58,9 +84,19 @@ Page({
         });
       }
 
-      return { ...s, rows, paramCount: fields.length };
+      return { ...s, rows, paramCount: fields.length, visible: activeSet.has(s.id) };
     });
     this.setData({ sensorCards: cards });
+  },
+
+  onSensorToggle(e) {
+    const id = e.currentTarget.dataset.id;
+    const filters = this.data.sensorFilters.map(f => {
+      if (f.id === id) return { ...f, active: !f.active };
+      return f;
+    });
+    this.setData({ sensorFilters: filters });
+    this._buildCards(this.data.sensorData, filters);
   },
 
   onRefresh() {

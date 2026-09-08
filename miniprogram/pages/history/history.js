@@ -1,4 +1,4 @@
-const { SENSORS, FIELD_LABELS, FIELD_UNITS } = require('../../config/sensors');
+const { FIELD_LABELS, FIELD_UNITS } = require('../../config/sensors');
 
 const METRICS = [
   { key: 'temp', label: '温度', unit: '°C', color1: '#ff6d00', color2: '#ffab40', thresholds: [
@@ -59,7 +59,7 @@ Page({
   data: {
     metrics: [],
     ranges: RANGES,
-    sensors: SENSORS,
+    sensors: [],
     selectedMetric: 'temp',
     selectedRange: '1h',
     loading: false,
@@ -71,17 +71,27 @@ Page({
     metricUnit: '°C',
     tempUnit: '°C',
     tempDropdownOpen: false,
-    showSensor: SENSORS.map(() => true),
+    showSensor: [],
     exportModalOpen: false,
     exportMetrics: [],
     exportRange: '1h',
     exporting: false
   },
 
+  _getSensors() {
+    const app = getApp();
+    return app._sensors ? app._sensors() : [];
+  },
+
   onLoad() {
     this._requestSeq = 0;
     const sysInfo = wx.getSystemInfoSync();
-    this.setData({ canvasWidth: sysInfo.windowWidth - 48 });
+    const sensors = this._getSensors();
+    this.setData({
+      canvasWidth: sysInfo.windowWidth - 48,
+      sensors: sensors,
+      showSensor: sensors.map(() => true)
+    });
     this._buildMetrics();
     this.loadData();
   },
@@ -126,6 +136,10 @@ Page({
   },
 
   onShow() {
+    const sensors = this._getSensors();
+    if (sensors.length > 0 && this.data.sensors.length !== sensors.length) {
+      this.setData({ sensors, showSensor: sensors.map(() => true) });
+    }
     this._buildMetrics();
     if (this.data.chartData) {
       setTimeout(() => this.drawChart(), 50);
@@ -202,14 +216,15 @@ Page({
       }
       groupMap[d.displayTime][d.sensor] = d.value;
     });
+    const sensors = this._getSensors();
     const tableData = Object.values(groupMap).map(row => ({
       displayTime: row.displayTime,
-      measurements: SENSORS.map(s => row[s.measurement] !== undefined ? row[s.measurement] : null)
+      measurements: sensors.map(s => row[s.measurement] !== undefined ? row[s.measurement] : null)
     }));
 
     // Compute stats per sensor (keyed by sensor ID)
     const stats = {};
-    SENSORS.forEach(s => {
+    sensors.forEach(s => {
       const vals = rounded.filter(d => d.sensor === s.measurement).map(d => d.value);
       if (vals.length === 0) {
         stats[s.id] = { min: '-', max: '-', avg: '-' };
@@ -286,12 +301,21 @@ Page({
     if (this.data.tempDropdownOpen) {
       this.setData({ tempDropdownOpen: false });
     }
+
+    const touches = e.touches;
+
+    // Pinch-to-zoom: 双指缩放
+    if (touches.length >= 2) {
+      this._handlePinch(e, touches);
+      return;
+    }
+
+    // Single touch: 十字线 + 工具提示
     const meta = this._chartMeta;
     if (!meta) return;
-    const touch = e.touches[0];
+    const touch = touches[0];
     if (!touch) return;
 
-    // Throttle: only redraw every 50ms during touch move
     const now = Date.now();
     if (e.type === 'touchmove' && this._lastTouchTime && now - this._lastTouchTime < 50) {
       this._pendingTouch = { e, touch };
@@ -310,6 +334,36 @@ Page({
     this._processTouch(e, touch);
   },
 
+  _handlePinch(e, touches) {
+    const x1 = touches[0].x, y1 = touches[0].y;
+    const x2 = touches[1].x, y2 = touches[1].y;
+    const dist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+
+    if (e.type === 'touchstart') {
+      this._pinchStartDist = dist;
+      this._pinchTriggered = false;
+      return;
+    }
+
+    if (e.type === 'touchmove' && this._pinchStartDist) {
+      const ratio = dist / this._pinchStartDist;
+      if (!this._pinchTriggered && (ratio > 1.35 || ratio < 0.7)) {
+        this._pinchTriggered = true;
+        const ranges = RANGES.map(r => r.key);
+        const curIdx = ranges.indexOf(this.data.selectedRange);
+        if (ratio > 1.35 && curIdx > 0) {
+          // 双指外扩 → 放大 → 更短时间范围
+          this.setData({ selectedRange: ranges[curIdx - 1] });
+          this.loadData();
+        } else if (ratio < 0.7 && curIdx < ranges.length - 1) {
+          // 双指内收 → 缩小 → 更长时间范围
+          this.setData({ selectedRange: ranges[curIdx + 1] });
+          this.loadData();
+        }
+      }
+    }
+  },
+
   _processTouch(e, touch) {
     const meta = this._chartMeta;
     if (!meta) return;
@@ -317,7 +371,6 @@ Page({
     const x = touch.x;
     const y = touch.y;
 
-    // Find nearest data point by x
     let bestIdx = 0;
     let bestDist = Infinity;
     for (let i = 0; i < meta.N; i++) {
@@ -325,7 +378,6 @@ Page({
       if (dist < bestDist) { bestDist = dist; bestIdx = i; }
     }
 
-    // Only show if within plot area
     if (x < meta.pad.l || x > meta.pad.l + meta.pw ||
         y < meta.pad.t || y > meta.pad.t + meta.ph) {
       this.drawChart();
@@ -336,12 +388,19 @@ Page({
   },
 
   onCanvasTouchEnd(e) {
+    const wasPinch = this._pinchTriggered;
+    this._pinchStartDist = 0;
+    this._pinchTriggered = false;
+    this._touchPending = null;
     if (this._touchTimer) {
       clearTimeout(this._touchTimer);
       this._touchTimer = null;
     }
     this._pendingTouch = null;
     this._lastTouchTime = 0;
+
+    if (wasPinch) return;  // 缩放已触发，跳过单击逻辑
+
     const changedTouches = e.changedTouches;
     if (!changedTouches || changedTouches.length === 0) {
       this.drawChart();
@@ -352,8 +411,9 @@ Page({
 
     // Check if tap on legend
     if (meta && touch) {
+      const sensors = this._getSensors();
       const legX = meta.pad.l + meta.pw - 195;
-      for (let i = 0; i < SENSORS.length; i++) {
+      for (let i = 0; i < sensors.length; i++) {
         const offsetX = i * 120;
         if (touch.x >= legX + offsetX && touch.x <= legX + offsetX + 105 &&
             touch.y >= 6 && touch.y <= 26) {
@@ -373,13 +433,14 @@ Page({
     const pw = W - pad.l - pad.r;
     const ph = H - pad.t - pad.b;
 
-    const series = SENSORS.map(s => data.filter(d => d.sensor === s.measurement));
+    const sensors = this._getSensors();
+    const series = sensors.map(s => data.filter(d => d.sensor === s.measurement));
 
     const ref = series.reduce((a, b) => a.length >= b.length ? a : b, series[0]);
     const N = Math.max(ref.length, 1);
 
     const visible = [];
-    SENSORS.forEach((s, i) => {
+    sensors.forEach((s, i) => {
       if (this.data.showSensor[i]) visible.push(...series[i]);
     });
     const vals = visible.length > 0 ? visible.map(d => d.value) : data.map(d => d.value);
@@ -425,7 +486,7 @@ Page({
     // Unit label at top of Y-axis
     const isTemp = this.data.selectedMetric === 'temp';
     const isF = isTemp && this.data.tempUnit === '°F';
-    const displayUnit = isF ? '°F' : metric.unit;
+    const displayUnit = isF ? '°F' : (metric && metric.unit) || '';
     ctx.fillStyle = '#999';
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'center';
@@ -433,7 +494,7 @@ Page({
     ctx.fillText(displayUnit, pad.l - 6, pad.t - 10);
 
     // Threshold lines
-    if (metric.thresholds) {
+    if (metric && metric.thresholds) {
       metric.thresholds.forEach(t => {
         const tVal = isF ? t.value * 9 / 5 + 32 : t.value;
         if (tVal < minV || tVal > maxV) return;
@@ -529,11 +590,9 @@ Page({
       ctx.stroke();
     };
 
-    const colors = [metric.color1, metric.color2];
-
-    SENSORS.forEach((s, i) => {
+    sensors.forEach((s, i) => {
       if (this.data.showSensor[i]) {
-        drawSeries(series[i], colors[i]);
+        drawSeries(series[i], s.color);
       }
     });
 
@@ -542,9 +601,9 @@ Page({
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    SENSORS.forEach((s, i) => {
+    sensors.forEach((s, i) => {
       const offsetX = i * 120;
-      ctx.fillStyle = this.data.showSensor[i] ? colors[i] : '#ccc';
+      ctx.fillStyle = this.data.showSensor[i] ? s.color : '#ccc';
       ctx.fillRect(legX + offsetX, 8, 14, 10);
       ctx.fillStyle = this.data.showSensor[i] ? '#333' : '#ccc';
       ctx.fillText(s.label + '(' + series[i].length + ')', legX + offsetX + 18, 8);
@@ -591,10 +650,11 @@ Page({
       };
       const sensorVals = series.map(findClosest);
 
+      const unit = (metric && metric.unit) || '';
       const lines = [t.displayTime];
-      SENSORS.forEach((s, i) => {
+      sensors.forEach((s, i) => {
         const val = sensorVals[i];
-        lines.push(s.label + ': ' + (val !== null ? val.toFixed(1) + metric.unit : '--'));
+        lines.push(s.label + ': ' + (val !== null ? val.toFixed(1) + unit : '--'));
       });
       const fontH = 14;
       const boxW = 180;
@@ -687,13 +747,14 @@ Page({
 
     const { exportRange } = this.data;
 
+    const sensors = this._getSensors();
     const timeMap = {};
     metricDataList.forEach(({ metric, data }) => {
       data.forEach(d => {
         if (!timeMap[d.displayTime]) {
           timeMap[d.displayTime] = { displayTime: d.displayTime };
         }
-        SENSORS.forEach(s => {
+        sensors.forEach(s => {
           if (d.sensor === s.measurement) {
             timeMap[d.displayTime][`${s.label}_${metric.key}`] = d.value;
           }
@@ -704,7 +765,7 @@ Page({
     const times = Object.keys(timeMap).sort();
     const columns = [];
     metricDataList.forEach(({ metric }) => {
-      SENSORS.forEach(s => {
+      sensors.forEach(s => {
         columns.push(`${s.label} ${metric.label}(${metric.unit})`);
       });
     });
@@ -714,7 +775,7 @@ Page({
       const row = timeMap[t];
       const vals = [];
       metricDataList.forEach(({ metric }) => {
-        SENSORS.forEach(s => {
+        sensors.forEach(s => {
           const key = `${s.label}_${metric.key}`;
           const v = row[key];
           vals.push(v !== undefined && v !== null && !isNaN(v) ? v : '');

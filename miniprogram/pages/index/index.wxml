@@ -12,11 +12,20 @@
     </view>
   </view>
 
+  <view class="filter-bar">
+    <view class="filter-chip {{item.active ? 'active' : ''}}" 
+          wx:for="{{sensorFilters}}" wx:key="id"
+          data-id="{{item.id}}" bindtap="onSensorToggle"
+          style="border-color:{{item.color}};{{item.active ? 'background:' + item.color + ';color:#fff;' : 'color:' + item.color + ';'}}">
+      <text>{{item.displayLabel}}</text>
+    </view>
+  </view>
+
   <view class="pull-hint" bindtap="onRefresh">
     <text class="pull-hint-text">点击刷新数据</text>
   </view>
 
-  <view class="card" wx:for="{{sensorCards}}" wx:key="id">
+  <view class="card" wx:for="{{sensorCards}}" wx:key="id" wx:if="{{item.visible}}">
     <view class="card-header">
       <view class="card-icon" style="background:{{item.iconBg}};color:{{item.iconColor}}">{{item.shortLabel}}</view>
       <view class="card-title-group">
@@ -35,6 +44,6 @@
   </view>
 
   <view class="footer">
-    <text class="footer-text">ESP32 Sensor Comparison v1.6.0</text>
+    <text class="footer-text">ESP32 Sensor Comparison v1.7.0</text>
   </view>
 </view>

@@ -50,6 +50,7 @@
       bindtouchmove="onCanvasTouch"
       bindtouchend="onCanvasTouchEnd"
     ></canvas>
+    <text class="pinch-hint" wx:if="{{chartData && chartData.length > 0}}">双指缩放切换时间范围</text>
     <view wx:if="{{loading}}" class="overlay">
       <text class="loading">加载中...</text>
     </view>

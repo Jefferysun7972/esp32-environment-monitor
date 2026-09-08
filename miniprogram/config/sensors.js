@@ -43,18 +43,27 @@ const FIELD_CSS_CLASS = {
   pressure: 'pressure'
 };
 
-// 传感器定义 —— 更换传感器只需修改这里
-const SENSORS = [
+// 传感器颜色调色板（自动发现时循环分配）
+const SENSOR_COLORS = [
+  { color: '#ff6d00', colorLight: '#ffab40', iconBg: '#fff3e0', iconColor: '#ff6d00' },
+  { color: '#1a73e8', colorLight: '#64b5f6', iconBg: '#e3f2fd', iconColor: '#1a73e8' },
+  { color: '#2e7d32', colorLight: '#81c784', iconBg: '#e8f5e9', iconColor: '#2e7d32' },
+  { color: '#6a1b9a', colorLight: '#ce93d8', iconBg: '#f3e5f5', iconColor: '#6a1b9a' },
+  { color: '#c62828', colorLight: '#ef9a9a', iconBg: '#ffebee', iconColor: '#c62828' },
+  { color: '#00695c', colorLight: '#4db6ac', iconBg: '#e0f2f1', iconColor: '#00695c' },
+  { color: '#37474f', colorLight: '#90a4ae', iconBg: '#eceff1', iconColor: '#37474f' },
+  { color: '#4a148c', colorLight: '#ab47bc', iconBg: '#f3e5f5', iconColor: '#4a148c' },
+];
+
+// 兜底传感器列表（仅在自动发现失败时使用）
+const ENV_FALLBACK_SENSORS = [
   {
     id: 'am2020dy',
     measurement: 'am2020dy',
     label: 'AM2020DY',
     shortLabel: 'AM',
     description: 'Sensor Module',
-    color: '#ff6d00',
-    colorLight: '#ffab40',
-    iconBg: '#fff3e0',
-    iconColor: '#ff6d00'
+    color: '#ff6d00', colorLight: '#ffab40', iconBg: '#fff3e0', iconColor: '#ff6d00'
   },
   {
     id: 'sen68',
@@ -62,18 +71,13 @@ const SENSORS = [
     label: 'SEN68',
     shortLabel: 'S6',
     description: 'Sensor Module',
-    color: '#1a73e8',
-    colorLight: '#64b5f6',
-    iconBg: '#e3f2fd',
-    iconColor: '#1a73e8'
+    color: '#1a73e8', colorLight: '#64b5f6', iconBg: '#e3f2fd', iconColor: '#1a73e8'
   }
 ];
 
-// 所有已知字段（从 FIELD_LABELS 自动生成，添加新字段只需改 FIELD_LABELS）
-const ALL_FIELDS = Object.keys(FIELD_LABELS);
-
 module.exports = {
-  SENSORS,
+  SENSOR_COLORS,
+  ENV_FALLBACK_SENSORS,
   FIELD_LABELS,
   FIELD_UNITS,
   FIELD_CSS_CLASS

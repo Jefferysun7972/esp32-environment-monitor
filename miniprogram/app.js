@@ -3,13 +3,18 @@ const INFLUXDB_ORG = 'Fellowes';
 const INFLUXDB_TOKEN = 'doR-H4EoxcxidC5AYN0NjzYQB7kJ5cusQvXe16b7j1W_tO4ouL35MlFayhPfTlnxR0djAgCwCFfgOVZSCXyzog==';
 const REFRESH_INTERVAL = 20000;
 
-const { SENSORS } = require('./config/sensors');
+const { SENSOR_COLORS, ENV_FALLBACK_SENSORS } = require('./config/sensors');
 
 App({
   globalData: {
-    sensorData: Object.fromEntries(SENSORS.map(s => [s.id, {}])),
+    sensors: [],
+    sensorData: {},
     connected: false,
     lastUpdate: ''
+  },
+
+  _sensors() {
+    return this.globalData.sensors.length > 0 ? this.globalData.sensors : ENV_FALLBACK_SENSORS;
   },
 
   _splitCSV(csv) {
@@ -26,12 +31,82 @@ App({
   },
 
   onLaunch() {
-    this.fetchData();
-    setInterval(() => this.fetchData(), REFRESH_INTERVAL);
+    this.discoverSensors(() => {
+      this.fetchData();
+      setInterval(() => this.fetchData(), REFRESH_INTERVAL);
+    });
+  },
+
+  discoverSensors(callback) {
+    const query = `import "influxdata/influxdb/schema"
+schema.measurements(bucket: "sensor_data")`;
+
+    wx.request({
+      url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
+      method: 'POST',
+      timeout: 10000,
+      header: {
+        'Authorization': 'Token ' + INFLUXDB_TOKEN,
+        'Content-Type': 'application/vnd.flux',
+        'Accept': 'application/csv'
+      },
+      data: query,
+      success: (res) => {
+        if (res.statusCode === 200) {
+          const measurements = this._parseMeasurementsCSV(res.data);
+          if (measurements.length > 0) {
+            const sensors = measurements.map((m, i) => {
+              const colors = SENSOR_COLORS[i % SENSOR_COLORS.length];
+              return {
+                id: m,
+                measurement: m,
+                label: m,
+                shortLabel: m.substring(0, 2).toUpperCase(),
+                description: 'Sensor Module',
+                ...colors
+              };
+            });
+            this.globalData.sensors = sensors;
+            this.globalData.sensorData = Object.fromEntries(sensors.map(s => [s.id, {}]));
+            console.log('[discover] 发现', sensors.length, '个传感器:', measurements.join(', '));
+            callback();
+            return;
+          }
+        }
+        this._fallbackSensors();
+        callback();
+      },
+      fail: () => {
+        this._fallbackSensors();
+        callback();
+      }
+    });
+  },
+
+  _fallbackSensors() {
+    console.warn('[discover] 自动发现失败，使用兜底传感器列表');
+    this.globalData.sensors = ENV_FALLBACK_SENSORS;
+    this.globalData.sensorData = Object.fromEntries(ENV_FALLBACK_SENSORS.map(s => [s.id, {}]));
+  },
+
+  _parseMeasurementsCSV(csv) {
+    const lines = this._splitCSV(csv);
+    if (lines.length < 2) return [];
+    const headers = lines[0].split(',');
+    const valueIdx = headers.indexOf('_value');
+    if (valueIdx < 0) return [];
+    const result = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      const name = (cols[valueIdx] || '').trim();
+      if (name) result.push(name);
+    }
+    return result;
   },
 
   fetchData() {
-    const measurements = SENSORS.map(s => s.measurement);
+    const sensors = this._sensors();
+    const measurements = sensors.map(s => s.measurement);
     let completed = 0;
     let successCount = 0;
 
@@ -56,7 +131,7 @@ App({
             const parsed = this.parseCSV(res.data);
             if (parsed.length > 0) {
               successCount++;
-              const sensor = SENSORS.find(s => s.measurement === measurement);
+              const sensor = sensors.find(s => s.measurement === measurement);
               const key = sensor ? sensor.id : measurement;
               const entry = this.globalData.sensorData[key] || {};
               parsed.forEach(row => {
@@ -64,11 +139,11 @@ App({
               });
               this.globalData.sensorData[key] = entry;
             } else {
-              console.warn('[fetchData]', measurement, '200 OK 但无数据行，原始响应:', res.data.substring(0, 200));
+              console.warn('[fetchData]', measurement, '200 OK 但无数据行');
               this.globalData._lastError = measurement + ': 无数据（ESP32 可能未上报）';
             }
           } else {
-            console.warn('[fetchData]', measurement, 'HTTP', res.statusCode, '原始响应:', res.data.substring(0, 200));
+            console.warn('[fetchData]', measurement, 'HTTP', res.statusCode);
             this.globalData._lastError = measurement + ': HTTP ' + res.statusCode;
           }
         },
@@ -130,7 +205,8 @@ App({
   },
 
   fetchHistory(range, field, callback) {
-    const measurementFilter = SENSORS.map(s => `r._measurement == "${s.measurement}"`).join(' or ');
+    const sensors = this._sensors();
+    const measurementFilter = sensors.map(s => `r._measurement == "${s.measurement}"`).join(' or ');
     const query = `from(bucket: "sensor_data")
   |> range(start: -${range})
   |> filter(fn: (r) => ${measurementFilter})

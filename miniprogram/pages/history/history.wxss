@@ -84,6 +84,15 @@
   display: block;
 }
 
+.pinch-hint {
+  position: absolute;
+  bottom: 6rpx;
+  right: 20rpx;
+  font-size: 18rpx;
+  color: #bbb;
+  pointer-events: none;
+}
+
 .overlay {
   position: absolute;
   top: 0;
