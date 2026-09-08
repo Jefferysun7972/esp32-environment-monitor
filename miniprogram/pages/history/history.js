@@ -41,6 +41,10 @@ const METRICS = [
     { value: 1000, color: '#ff9800', label: '1000' },
     { value: 2000, color: '#e53935', label: '2000' }
   ]},
+  { key: 'pressure', label: '大气压', unit: 'hPa', color1: '#006064', color2: '#4dd0e1', thresholds: [
+    { value: 1000, color: '#ff9800', label: '1000' },
+    { value: 1030, color: '#e53935', label: '1030' }
+  ]},
 ];
 
 const RANGES = [

@@ -9,7 +9,8 @@ const FIELD_LABELS = {
   hcho: 'HCHO',
   no2: 'NO₂',
   nox: 'NOx',
-  co2: 'CO₂'
+  co2: 'CO₂',
+  pressure: '大气压'
 };
 
 // 字段单位映射
@@ -23,7 +24,8 @@ const FIELD_UNITS = {
   hcho: 'µg/m³',
   no2: 'µg/m³',
   nox: 'µg/m³',
-  co2: 'ppm'
+  co2: 'ppm',
+  pressure: 'hPa'
 };
 
 // 字段 CSS 类名映射
@@ -37,7 +39,8 @@ const FIELD_CSS_CLASS = {
   hcho: 'hcho',
   no2: 'gas',
   nox: 'gas',
-  co2: 'gas'
+  co2: 'gas',
+  pressure: 'pressure'
 };
 
 // 传感器定义 —— 更换传感器只需修改这里
@@ -47,10 +50,10 @@ const SENSORS = [
     measurement: 'am2020dy',
     label: 'AM2020DY',
     shortLabel: 'AM',
-    description: '8-in-1 Sensor Module',
-    paramCount: 8,
-    fields: ['temp', 'humi', 'pm1', 'pm25', 'pm10', 'tvoc', 'no2', 'hcho'],
-    rowLayout: [2, 3, 3],
+    description: '9-in-1 Sensor Module',
+    paramCount: 9,
+    fields: ['temp', 'humi', 'pm1', 'pm25', 'pm10', 'tvoc', 'no2', 'hcho', 'pressure'],
+    rowLayout: [3, 3, 3],
     color: '#ff6d00',
     colorLight: '#ffab40',
     iconBg: '#fff3e0',
@@ -61,10 +64,10 @@ const SENSORS = [
     measurement: 'SEN68',
     label: 'SEN68',
     shortLabel: 'S6',
-    description: '8-in-1 Sensor Module',
-    paramCount: 8,
-    fields: ['temp', 'humi', 'pm1', 'pm25', 'pm10', 'tvoc', 'nox', 'hcho'],
-    rowLayout: [2, 3, 3],
+    description: '9-in-1 Sensor Module',
+    paramCount: 9,
+    fields: ['temp', 'humi', 'pm1', 'pm25', 'pm10', 'tvoc', 'nox', 'hcho', 'pressure'],
+    rowLayout: [3, 3, 3],
     color: '#1a73e8',
     colorLight: '#64b5f6',
     iconBg: '#e3f2fd',
