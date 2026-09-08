@@ -86,6 +86,39 @@
   margin-left: 6rpx;
 }
 
+.temp-toggle {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1rpx solid rgba(255, 255, 255, 0.25);
+  border-radius: 20rpx;
+  padding: 4rpx 10rpx;
+  transition: all 0.2s ease;
+}
+
+.temp-toggle.active {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.temp-toggle-label {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.65);
+  transition: color 0.2s ease;
+}
+
+.temp-toggle.active .temp-toggle-label {
+  color: #fff;
+  font-weight: 600;
+}
+
+.temp-toggle-divider {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0 4rpx;
+}
+
 /* Filter Bar */
 .filter-bar {
   display: flex;

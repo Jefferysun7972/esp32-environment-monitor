@@ -7,7 +7,8 @@ Page({
     sensorFilters: [],
     connected: false,
     lastUpdate: '',
-    dataCached: false
+    dataCached: false,
+    isFahrenheit: false
   },
 
   _getSensors() {
@@ -79,12 +80,18 @@ Page({
           if (val >= danger) status = 'danger';
           else if (val >= warn) status = 'warn';
         }
+        let displayVal = val !== null ? val : '--';
+        let displayUnit = FIELD_UNITS[f] || '';
+        if (f === 'temp' && val !== null && this.data.isFahrenheit) {
+          displayVal = (val * 9 / 5 + 32).toFixed(1);
+          displayUnit = '°F';
+        }
         return {
           key: f,
           label: FIELD_LABELS[f] || f,
-          unit: FIELD_UNITS[f] || '',
+          unit: displayUnit,
           cssClass: FIELD_CSS_CLASS[f] || '',
-          value: val !== null ? val : '--',
+          value: displayVal,
           status: status
         };
       });
@@ -124,5 +131,11 @@ Page({
     const app = getApp();
     app.fetchData();
     setTimeout(() => wx.stopPullDownRefresh(), 1000);
+  },
+
+  onTempUnitToggle() {
+    const isFahrenheit = !this.data.isFahrenheit;
+    this.setData({ isFahrenheit });
+    this._buildCards(this.data.sensorData, this.data.sensorFilters);
   }
 });

@@ -186,11 +186,16 @@ schema.measurements(bucket: "sensor_data")`;
     });
   },
 
-  parseCSV(csv) {
+  _getCSVHeaders(csv) {
     const lines = this._splitCSV(csv);
-    if (lines.length < 2) return [];
+    if (lines.length < 2) return null;
+    return { lines, headers: lines[0].split(',') };
+  },
 
-    const headers = lines[0].split(',');
+  parseCSV(csv) {
+    const parsed = this._getCSVHeaders(csv);
+    if (!parsed) return [];
+    const { lines, headers } = parsed;
     const fieldIdx = headers.indexOf('_field');
     const valueIdx = headers.indexOf('_value');
     if (fieldIdx < 0 || valueIdx < 0) return [];
@@ -241,18 +246,14 @@ schema.measurements(bucket: "sensor_data")`;
   },
 
   getWindow(range) {
-    if (range === '1h') return '1m';
-    if (range === '6h') return '5m';
-    if (range === '24h') return '15m';
-    if (range === '7d') return '1h';
-    return '6h';
+    const map = { '1h': '1m', '6h': '5m', '24h': '15m', '7d': '1h' };
+    return map[range] || '6h';
   },
 
   parseTimeCSV(csv, range) {
-    const lines = this._splitCSV(csv);
-    if (lines.length < 2) return [];
-
-    const headers = lines[0].split(',');
+    const parsed = this._getCSVHeaders(csv);
+    if (!parsed) return [];
+    const { lines, headers } = parsed;
     const timeIdx = headers.indexOf('_time');
     const measurementIdx = headers.indexOf('_measurement');
     const fieldIdx = headers.indexOf('_field');
