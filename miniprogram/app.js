@@ -3,7 +3,7 @@ const INFLUXDB_ORG = 'Fellowes';
 const INFLUXDB_TOKEN = 'doR-H4EoxcxidC5AYN0NjzYQB7kJ5cusQvXe16b7j1W_tO4ouL35MlFayhPfTlnxR0djAgCwCFfgOVZSCXyzog==';
 const REFRESH_INTERVAL = 20000;
 
-const { SENSORS, ALL_FIELDS } = require('./config/sensors');
+const { SENSORS } = require('./config/sensors');
 
 App({
   globalData: {
@@ -36,11 +36,9 @@ App({
     let successCount = 0;
 
     measurements.forEach((measurement) => {
-      const fieldFilter = ALL_FIELDS.map(f => `r._field == "${f}"`).join(' or ');
       const query = `from(bucket: "sensor_data")
   |> range(start: -5m)
   |> filter(fn: (r) => r._measurement == "${measurement}")
-  |> filter(fn: (r) => ${fieldFilter})
   |> aggregateWindow(every: 5m, fn: last, createEmpty: false)`;
 
       wx.request({

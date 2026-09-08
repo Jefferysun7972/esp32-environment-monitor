@@ -1,4 +1,4 @@
-const { SENSORS, FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS, ALL_FIELDS } = require('../../config/sensors');
+const { SENSORS, FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS } = require('../../config/sensors');
 
 Page({
   data: {
@@ -39,7 +39,8 @@ Page({
   _buildCards(sensorData) {
     const cards = SENSORS.map(s => {
       const data = sensorData[s.id] || {};
-      const allMetrics = ALL_FIELDS.map(f => ({
+      const fields = Object.keys(data);
+      const allMetrics = fields.map(f => ({
         key: f,
         label: FIELD_LABELS[f] || f,
         unit: FIELD_UNITS[f] || '',
@@ -57,7 +58,7 @@ Page({
         });
       }
 
-      return { ...s, rows, paramCount: ALL_FIELDS.length };
+      return { ...s, rows, paramCount: fields.length };
     });
     this.setData({ sensorCards: cards });
   },

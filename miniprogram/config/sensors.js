@@ -76,6 +76,5 @@ module.exports = {
   SENSORS,
   FIELD_LABELS,
   FIELD_UNITS,
-  FIELD_CSS_CLASS,
-  ALL_FIELDS
+  FIELD_CSS_CLASS
 };

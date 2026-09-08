@@ -35,6 +35,6 @@
   </view>
 
   <view class="footer">
-    <text class="footer-text">ESP32 Sensor Comparison v1.5.0</text>
+    <text class="footer-text">ESP32 Sensor Comparison v1.6.0</text>
   </view>
 </view>

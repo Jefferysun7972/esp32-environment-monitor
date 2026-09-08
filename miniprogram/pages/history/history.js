@@ -1,4 +1,4 @@
-const { SENSORS } = require('../../config/sensors');
+const { SENSORS, FIELD_LABELS, FIELD_UNITS } = require('../../config/sensors');
 
 const METRICS = [
   { key: 'temp', label: '温度', unit: '°C', color1: '#ff6d00', color2: '#ffab40', thresholds: [
@@ -90,7 +90,6 @@ Page({
     const app = getApp();
     const sensorData = app.globalData.sensorData || {};
     const metrics = METRICS.map(m => {
-      // 数据驱动：检查是否有传感器实际上报了该字段的数据
       let supported = false;
       for (const sid in sensorData) {
         if (sensorData[sid][m.key] !== undefined && sensorData[sid][m.key] !== null && !isNaN(sensorData[sid][m.key])) {
@@ -100,6 +99,29 @@ Page({
       }
       return { ...m, supported };
     });
+
+    // 自动发现 METRICS 中未定义但 ESP32 实际在报的新字段
+    const knownKeys = new Set(METRICS.map(m => m.key));
+    const discovered = new Set();
+    for (const sid in sensorData) {
+      for (const key in sensorData[sid]) {
+        if (!knownKeys.has(key) && sensorData[sid][key] !== undefined && !isNaN(sensorData[sid][key])) {
+          discovered.add(key);
+        }
+      }
+    }
+    discovered.forEach(key => {
+      metrics.push({
+        key,
+        label: FIELD_LABELS[key] || key,
+        unit: FIELD_UNITS[key] || '',
+        color1: '#607d8b',
+        color2: '#90a4ae',
+        thresholds: [],
+        supported: true
+      });
+    });
+
     this.setData({ metrics });
   },
 
