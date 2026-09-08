@@ -466,3 +466,93 @@
   background: #333;
   color: #aaa;
 }
+
+.theme-dark .chart-container {
+  background: #252540;
+}
+
+.theme-dark .overlay {
+  background: #252540;
+}
+
+.theme-dark .overlay .loading,
+.theme-dark .overlay .empty-text {
+  color: #aaa;
+}
+
+.theme-dark .overlay .empty-hint {
+  color: #777;
+}
+
+.theme-dark .stats-bar {
+  background: #252540;
+}
+
+.theme-dark .stats-card {
+  background: #2a2a45;
+}
+
+.theme-dark .stats-sensor {
+  color: #ccc;
+}
+
+.theme-dark .stats-value {
+  color: #e0e0e0;
+}
+
+.theme-dark .data-table {
+  background: #252540;
+}
+
+.theme-dark .table-header {
+  border-bottom-color: #333;
+}
+
+.theme-dark .table-row {
+  border-bottom-color: #2a2a45;
+}
+
+.theme-dark .col-time {
+  color: #aaa;
+}
+
+.theme-dark .col-val {
+  color: #ccc;
+}
+
+.theme-dark .export-modal-panel {
+  background: #252540;
+}
+
+.theme-dark .export-modal-hint {
+  color: #777;
+}
+
+.theme-dark .export-range-chip {
+  background: #2a2a45;
+  color: #aaa;
+}
+
+.theme-dark .export-item {
+  background: #2a2a45;
+}
+
+.theme-dark .export-item.checked {
+  background: #1a3a5c;
+}
+
+.theme-dark .export-item-label {
+  color: #ccc;
+}
+
+.theme-dark .export-item-unit {
+  color: #888;
+}
+
+.theme-dark .export-modal-actions {
+  border-top-color: #333;
+}
+
+.theme-dark .pinch-hint {
+  color: #666;
+}

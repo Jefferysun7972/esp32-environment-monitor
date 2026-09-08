@@ -66,7 +66,17 @@ Page({
       isFahrenheit: app.getTempUnit(),
       pageTheme: app.getTheme()
     });
+    this._syncTabBar(app.getTheme());
     this._buildCards(app.globalData.sensorData, filters);
+  },
+
+  _syncTabBar(theme) {
+    wx.setTabBarStyle({
+      color: theme === 'dark' ? '#777' : '#999',
+      selectedColor: '#1a73e8',
+      backgroundColor: theme === 'dark' ? '#1a1a2e' : '#fff',
+      borderStyle: theme === 'dark' ? 'white' : 'black'
+    });
   },
 
   _buildCards(sensorData, sensorFilters) {

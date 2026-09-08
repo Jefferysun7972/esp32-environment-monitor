@@ -54,13 +54,26 @@ Page({
 
   onLoad() {
     this._requestSeq = 0;
+    const app = getApp();
     const sysInfo = wx.getSystemInfoSync();
     const sensors = this._getSensors();
+    const isFahrenheit = app.getTempUnit();
     this.setData({
       canvasWidth: sysInfo.windowWidth - 48,
       sensors: sensors,
-      showSensor: sensors.map(() => true)
+      showSensor: sensors.map(() => true),
+      tempUnit: isFahrenheit ? '°F' : '°C',
+      pageTheme: app.getTheme()
     });
+
+    this._onSensorUpdate = () => {
+      const sensors = this._getSensors();
+      if (sensors.length > 0 && this.data.sensors.length !== sensors.length) {
+        this.setData({ sensors, showSensor: sensors.map(() => true) });
+      }
+      this._buildMetrics();
+    };
+
     this._buildMetrics();
     this.loadData();
   },
@@ -68,13 +81,18 @@ Page({
   _buildMetrics() {
     const app = getApp();
     const sensorData = app.globalData.sensorData || {};
+    const hasData = Object.keys(sensorData).length > 0;
     const metrics = METRICS.map(m => {
       let supported = false;
-      for (const sid in sensorData) {
-        if (sensorData[sid][m.key] !== undefined && sensorData[sid][m.key] !== null && !isNaN(sensorData[sid][m.key])) {
-          supported = true;
-          break;
+      if (hasData) {
+        for (const sid in sensorData) {
+          if (sensorData[sid][m.key] !== undefined && sensorData[sid][m.key] !== null && !isNaN(sensorData[sid][m.key])) {
+            supported = true;
+            break;
+          }
         }
+      } else {
+        supported = true;
       }
       return { ...m, supported };
     });
@@ -112,11 +130,25 @@ Page({
     if (sensors.length > 0 && this.data.sensors.length !== sensors.length) {
       this.setData({ sensors, showSensor: sensors.map(() => true) });
     }
-    this.setData({ pageTheme: app.getTheme() });
+    const isFahrenheit = app.getTempUnit();
+    this.setData({
+      pageTheme: app.getTheme(),
+      tempUnit: isFahrenheit ? '°F' : '°C'
+    });
+    this._syncTabBar(app.getTheme());
     this._buildMetrics();
     if (this.data.chartData) {
       setTimeout(() => this.drawChart(), 50);
     }
+  },
+
+  _syncTabBar(theme) {
+    wx.setTabBarStyle({
+      color: theme === 'dark' ? '#777' : '#999',
+      selectedColor: '#1a73e8',
+      backgroundColor: theme === 'dark' ? '#1a1a2e' : '#fff',
+      borderStyle: theme === 'dark' ? 'white' : 'black'
+    });
   },
 
   onPullDownRefresh() {
@@ -432,17 +464,30 @@ Page({
     const sy = (v) => pad.t + ph - ((v - minV) / (maxV - minV)) * ph;
 
     const metric = this.data.metrics.find(m => m.key === this.data.selectedMetric);
+    const isDark = this.data.pageTheme === 'dark';
+
+    const theme = {
+      chartBg: isDark ? '#1e1e30' : '#fafafa',
+      gridLine: isDark ? '#333' : '#e8e8e8',
+      gridText: isDark ? '#777' : '#999',
+      xLabel1: isDark ? '#777' : '#bbb',
+      xLabel2: isDark ? '#666' : '#999',
+      legendText: isDark ? '#ccc' : '#333',
+      legendDisabled: isDark ? '#555' : '#ccc',
+      tooltipBg: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.75)',
+      tooltipText: isDark ? '#333' : '#fff'
+    };
 
     ctx.clearRect(0, 0, W, H);
 
     // Background
-    ctx.fillStyle = '#fafafa';
+    ctx.fillStyle = theme.chartBg;
     ctx.fillRect(pad.l, pad.t, pw, ph);
 
     // Grid lines
-    ctx.strokeStyle = '#e8e8e8';
+    ctx.strokeStyle = theme.gridLine;
     ctx.lineWidth = 0.5;
-    ctx.fillStyle = '#999';
+    ctx.fillStyle = theme.gridText;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
@@ -460,7 +505,7 @@ Page({
     const isTemp = this.data.selectedMetric === 'temp';
     const isF = isTemp && this.data.tempUnit === '°F';
     const displayUnit = isF ? '°F' : (metric && metric.unit) || '';
-    ctx.fillStyle = '#999';
+    ctx.fillStyle = theme.gridText;
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
@@ -501,14 +546,14 @@ Page({
       const label = ref[i].displayTime;
       if (isLongRange) {
         const parts = label.split(' ');
-        ctx.fillStyle = '#bbb';
+        ctx.fillStyle = theme.xLabel1;
         ctx.font = '9px sans-serif';
         ctx.fillText(parts[0] || '', sx(i), pad.t + ph + 6);
-        ctx.fillStyle = '#999';
+        ctx.fillStyle = theme.xLabel2;
         ctx.font = '10px sans-serif';
         ctx.fillText(parts[1] || '', sx(i), pad.t + ph + 20);
       } else {
-        ctx.fillStyle = '#999';
+        ctx.fillStyle = theme.xLabel2;
         ctx.font = '10px sans-serif';
         ctx.fillText(label, sx(i), pad.t + ph + 6);
       }
@@ -576,9 +621,9 @@ Page({
     ctx.textBaseline = 'top';
     sensors.forEach((s, i) => {
       const offsetX = i * 120;
-      ctx.fillStyle = this.data.showSensor[i] ? s.color : '#ccc';
+      ctx.fillStyle = this.data.showSensor[i] ? s.color : theme.legendDisabled;
       ctx.fillRect(legX + offsetX, 8, 14, 10);
-      ctx.fillStyle = this.data.showSensor[i] ? '#333' : '#ccc';
+      ctx.fillStyle = this.data.showSensor[i] ? theme.legendText : theme.legendDisabled;
       ctx.fillText(s.label + '(' + series[i].length + ')', legX + offsetX + 18, 8);
     });
 
@@ -623,7 +668,7 @@ Page({
       };
       const sensorVals = series.map(findClosest);
 
-      const unit = (metric && metric.unit) || '';
+      const unit = this.data.metricUnit || (metric && metric.unit) || '';
       const lines = [t.displayTime];
       sensors.forEach((s, i) => {
         const val = sensorVals[i];
@@ -637,12 +682,12 @@ Page({
       if (bx + boxW > W) bx = cx - boxW - 10;
       if (by < 0) by = y + 10;
 
-      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillStyle = theme.tooltipBg;
       ctx.beginPath();
       ctx.roundRect ? ctx.roundRect(bx, by, boxW, boxH, 6) : ctx.fillRect(bx, by, boxW, boxH);
       ctx.fill();
 
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = theme.tooltipText;
       ctx.font = '12px sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';

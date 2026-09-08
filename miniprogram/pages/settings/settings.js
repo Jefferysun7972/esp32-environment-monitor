@@ -12,6 +12,8 @@ Page({
       isFahrenheit: app.getTempUnit()
     });
 
+    this._syncTabBar();
+
     const pages = getCurrentPages();
     pages.forEach(p => {
       if (p.setData) {
@@ -20,10 +22,22 @@ Page({
     });
   },
 
+  _syncTabBar() {
+    const theme = app.getTheme();
+    wx.setTabBarStyle({
+      color: theme === 'dark' ? '#777' : '#999',
+      selectedColor: '#1a73e8',
+      backgroundColor: theme === 'dark' ? '#1a1a2e' : '#fff',
+      borderStyle: theme === 'dark' ? 'white' : 'black'
+    });
+  },
+
   onThemeChange(e) {
     const theme = e.detail.value ? 'dark' : 'light';
     app.setTheme(theme);
     this.setData({ theme });
+
+    this._syncTabBar();
 
     const pages = getCurrentPages();
     pages.forEach(p => {
