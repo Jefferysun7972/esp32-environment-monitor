@@ -10,7 +10,8 @@ App({
     sensors: [],
     sensorData: {},
     connected: false,
-    lastUpdate: ''
+    lastUpdate: '',
+    dataCached: false
   },
 
   _sensors() {
@@ -31,10 +32,33 @@ App({
   },
 
   onLaunch() {
+    this._loadCache();
     this.discoverSensors(() => {
       this.fetchData();
       setInterval(() => this.fetchData(), REFRESH_INTERVAL);
     });
+  },
+
+  _loadCache() {
+    try {
+      const cache = wx.getStorageSync('sensor_cache');
+      if (cache && cache.sensorData && cache.lastUpdate) {
+        this.globalData.sensorData = cache.sensorData;
+        this.globalData.lastUpdate = cache.lastUpdate + ' (缓存)';
+        this.globalData.dataCached = true;
+      }
+    } catch (e) {}
+  },
+
+  _saveCache() {
+    try {
+      wx.setStorageSync('sensor_cache', {
+        sensorData: this.globalData.sensorData,
+        lastUpdate: this.globalData.lastUpdate,
+        timestamp: Date.now()
+      });
+      this.globalData.dataCached = false;
+    } catch (e) {}
   },
 
   discoverSensors(callback) {
@@ -158,6 +182,7 @@ schema.measurements(bucket: "sensor_data")`;
             this.globalData.connected = successCount > 0;
             if (successCount > 0) {
               this.globalData.lastUpdate = new Date().toLocaleTimeString();
+              this._saveCache();
             }
             this.notifyPages();
             if (!this.globalData.connected) {

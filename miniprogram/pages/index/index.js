@@ -6,7 +6,8 @@ Page({
     sensorCards: [],
     sensorFilters: [],
     connected: false,
-    lastUpdate: ''
+    lastUpdate: '',
+    dataCached: false
   },
 
   _getSensors() {
@@ -17,10 +18,12 @@ Page({
   onLoad() {
     const app = getApp();
     this._onSensorUpdate = (data, connected, lastUpdate) => {
+      const app = getApp();
       this.setData({
         sensorData: data,
         connected: connected,
-        lastUpdate: lastUpdate || ''
+        lastUpdate: lastUpdate || '',
+        dataCached: app.globalData.dataCached || false
       });
       this._buildCards(data, this.data.sensorFilters);
     };
@@ -54,7 +57,8 @@ Page({
     this.setData({
       sensorData: app.globalData.sensorData,
       connected: app.globalData.connected,
-      lastUpdate: app.globalData.lastUpdate || ''
+      lastUpdate: app.globalData.lastUpdate || '',
+      dataCached: app.globalData.dataCached || false
     });
     this._buildCards(app.globalData.sensorData, filters);
   },

@@ -8,6 +8,7 @@
         <view class="status-dot {{connected ? 'on' : 'off'}}"></view>
         <text class="status-text">{{connected ? '在线' : '离线'}}</text>
         <text class="update-text" wx:if="{{lastUpdate}}">{{lastUpdate}} 更新</text>
+        <text class="cache-badge" wx:if="{{dataCached}}">缓存</text>
       </view>
     </view>
   </view>

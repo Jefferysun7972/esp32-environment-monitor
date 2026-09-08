@@ -76,6 +76,16 @@
   margin-left: auto;
 }
 
+.cache-badge {
+  font-size: 18rpx;
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.15);
+  border: 1rpx solid rgba(255, 152, 0, 0.3);
+  border-radius: 6rpx;
+  padding: 2rpx 8rpx;
+  margin-left: 6rpx;
+}
+
 /* Filter Bar */
 .filter-bar {
   display: flex;
