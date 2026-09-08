@@ -207,7 +207,7 @@ Page({
       }
     });
 
-    const metric = METRICS.find(m => m.key === this.data.selectedMetric);
+    const metric = this.data.metrics.find(m => m.key === this.data.selectedMetric);
     const metricUnit = isTemp && toFahrenheit ? '°F' : (metric ? metric.unit : '');
 
     this.setData({ chartData: rounded, tableData, stats, metricUnit, loading: false }, () => {
@@ -428,7 +428,7 @@ Page({
     const sx = (i) => pad.l + (i / Math.max(N - 1, 1)) * pw;
     const sy = (v) => pad.t + ph - ((v - minV) / (maxV - minV)) * ph;
 
-    const metric = METRICS.find(m => m.key === this.data.selectedMetric);
+    const metric = this.data.metrics.find(m => m.key === this.data.selectedMetric);
 
     ctx.clearRect(0, 0, W, H);
 
