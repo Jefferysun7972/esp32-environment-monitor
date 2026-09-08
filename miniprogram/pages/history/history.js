@@ -1,51 +1,19 @@
-const { FIELD_LABELS, FIELD_UNITS } = require('../../config/sensors');
+const { FIELD_LABELS, FIELD_UNITS, FIELD_THRESHOLDS } = require('../../config/sensors');
 
-const METRICS = [
-  { key: 'temp', label: '温度', unit: '°C', color1: '#ff6d00', color2: '#ffab40', thresholds: [
-    { value: 26, color: '#ff9800', label: '26°C' },
-    { value: 35, color: '#e53935', label: '35°C' }
-  ]},
-  { key: 'humi', label: '湿度', unit: '%', color1: '#1a73e8', color2: '#64b5f6', thresholds: [
-    { value: 70, color: '#ff9800', label: '70%' },
-    { value: 90, color: '#e53935', label: '90%' }
-  ]},
-  { key: 'pm25', label: 'PM2.5', unit: 'µg/m³', color1: '#6a1b9a', color2: '#ce93d8', thresholds: [
-    { value: 35, color: '#ff9800', label: '35' },
-    { value: 75, color: '#e53935', label: '75' }
-  ]},
-  { key: 'pm1', label: 'PM1.0', unit: 'µg/m³', color1: '#7b1fa2', color2: '#ba68c8', thresholds: [
-    { value: 25, color: '#ff9800', label: '25' },
-    { value: 50, color: '#e53935', label: '50' }
-  ]},
-  { key: 'pm10', label: 'PM10', unit: 'µg/m³', color1: '#4a148c', color2: '#9c27b0', thresholds: [
-    { value: 50, color: '#ff9800', label: '50' },
-    { value: 150, color: '#e53935', label: '150' }
-  ]},
-  { key: 'tvoc', label: 'TVOC', unit: 'ppb', color1: '#c62828', color2: '#ef5350', thresholds: [
-    { value: 500, color: '#ff9800', label: '500' },
-    { value: 1000, color: '#e53935', label: '1000' }
-  ]},
-  { key: 'hcho', label: 'HCHO', unit: 'µg/m³', color1: '#e65100', color2: '#ff9800', thresholds: [
-    { value: 100, color: '#ff9800', label: '100' },
-    { value: 200, color: '#e53935', label: '200' }
-  ]},
-  { key: 'no2', label: 'NO₂', unit: 'µg/m³', color1: '#2e7d32', color2: '#66bb6a', thresholds: [
-    { value: 100, color: '#ff9800', label: '100' },
-    { value: 200, color: '#e53935', label: '200' }
-  ]},
-  { key: 'nox', label: 'NOx', unit: 'µg/m³', color1: '#1b5e20', color2: '#4caf50', thresholds: [
-    { value: 100, color: '#ff9800', label: '100' },
-    { value: 200, color: '#e53935', label: '200' }
-  ]},
-  { key: 'co2', label: 'CO₂', unit: 'ppm', color1: '#004d40', color2: '#26a69a', thresholds: [
-    { value: 1000, color: '#ff9800', label: '1000' },
-    { value: 2000, color: '#e53935', label: '2000' }
-  ]},
-  { key: 'pressure', label: '大气压', unit: 'hPa', color1: '#006064', color2: '#4dd0e1', thresholds: [
-    { value: 1000, color: '#ff9800', label: '1000' },
-    { value: 1030, color: '#e53935', label: '1030' }
-  ]},
-];
+// 从共享配置动态生成指标定义（阈值与 index 页共享）
+const METRICS = Object.keys(FIELD_LABELS).map(key => {
+  const t = FIELD_THRESHOLDS[key];
+  const unit = FIELD_UNITS[key] || '';
+  return {
+    key,
+    label: FIELD_LABELS[key] || key,
+    unit,
+    thresholds: t ? [
+      { value: t[0], color: '#ff9800', label: t[0] + unit },
+      { value: t[1], color: '#e53935', label: t[1] + unit }
+    ] : []
+  };
+});
 
 const RANGES = [
   { key: '1h', label: '1小时' },
@@ -121,13 +89,15 @@ Page({
       }
     }
     discovered.forEach(key => {
+      const t = FIELD_THRESHOLDS[key];
       metrics.push({
         key,
         label: FIELD_LABELS[key] || key,
         unit: FIELD_UNITS[key] || '',
-        color1: '#607d8b',
-        color2: '#90a4ae',
-        thresholds: [],
+        thresholds: t ? [
+          { value: t[0], color: '#ff9800', label: t[0] + (FIELD_UNITS[key] || '') },
+          { value: t[1], color: '#e53935', label: t[1] + (FIELD_UNITS[key] || '') }
+        ] : [],
         supported: true
       });
     });

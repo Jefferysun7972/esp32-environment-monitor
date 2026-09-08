@@ -43,6 +43,21 @@ const FIELD_CSS_CLASS = {
   pressure: 'pressure'
 };
 
+// 字段阈值定义：{ key: [warn_value, danger_value] }
+const FIELD_THRESHOLDS = {
+  temp: [26, 35],
+  humi: [70, 90],
+  pm1: [25, 50],
+  pm25: [35, 75],
+  pm10: [50, 150],
+  tvoc: [500, 1000],
+  hcho: [100, 200],
+  no2: [100, 200],
+  nox: [100, 200],
+  co2: [1000, 2000],
+  pressure: [1000, 1030]
+};
+
 // 传感器颜色调色板（自动发现时循环分配）
 const SENSOR_COLORS = [
   { color: '#ff6d00', colorLight: '#ffab40', iconBg: '#fff3e0', iconColor: '#ff6d00' },
@@ -80,5 +95,6 @@ module.exports = {
   ENV_FALLBACK_SENSORS,
   FIELD_LABELS,
   FIELD_UNITS,
-  FIELD_CSS_CLASS
+  FIELD_CSS_CLASS,
+  FIELD_THRESHOLDS
 };

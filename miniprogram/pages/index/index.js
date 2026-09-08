@@ -1,19 +1,4 @@
-const { FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS } = require('../../config/sensors');
-
-// 阈值定义：{ key: [warn_value, danger_value] }
-const THRESHOLDS = {
-  temp: [26, 35],
-  humi: [70, 90],
-  pm1: [25, 50],
-  pm25: [35, 75],
-  pm10: [50, 150],
-  tvoc: [500, 1000],
-  hcho: [100, 200],
-  no2: [100, 200],
-  nox: [100, 200],
-  co2: [1000, 2000],
-  pressure: [1000, 1030]
-};
+const { FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS, FIELD_THRESHOLDS } = require('../../config/sensors');
 
 Page({
   data: {
@@ -89,8 +74,8 @@ Page({
         const rawVal = data[f];
         const val = rawVal !== undefined && rawVal !== null && !isNaN(rawVal) ? rawVal : null;
         let status = '';
-        if (val !== null && THRESHOLDS[f]) {
-          const [warn, danger] = THRESHOLDS[f];
+        if (val !== null && FIELD_THRESHOLDS[f]) {
+          const [warn, danger] = FIELD_THRESHOLDS[f];
           if (val >= danger) status = 'danger';
           else if (val >= warn) status = 'warn';
         }
