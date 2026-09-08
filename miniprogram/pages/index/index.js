@@ -68,6 +68,7 @@ Page({
   },
 
   _buildCards(sensorData, sensorFilters) {
+    const app = getApp();
     const sensors = this._getSensors();
     const filters = sensorFilters || this.data.sensorFilters || [];
     const activeSet = new Set(filters.filter(f => f.active).map(f => f.id));
