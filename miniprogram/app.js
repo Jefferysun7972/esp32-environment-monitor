@@ -19,18 +19,20 @@ App({
   fetchData() {
     const measurements = SENSORS.map(s => s.measurement);
     let completed = 0;
+    let successCount = 0;
 
     measurements.forEach((measurement) => {
       const fieldFilter = ALL_FIELDS.map(f => `r._field == "${f}"`).join(' or ');
       const query = `from(bucket: "sensor_data")
-  |> range(start: -1m)
+  |> range(start: -5m)
   |> filter(fn: (r) => r._measurement == "${measurement}")
   |> filter(fn: (r) => ${fieldFilter})
-  |> last()`;
+  |> aggregateWindow(every: 5m, fn: last, createEmpty: false)`;
 
       wx.request({
         url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
         method: 'POST',
+        timeout: 15000,
         header: {
           'Authorization': 'Token ' + INFLUXDB_TOKEN,
           'Content-Type': 'application/vnd.flux',
@@ -41,25 +43,39 @@ App({
           if (res.statusCode === 200) {
             const parsed = this.parseCSV(res.data);
             if (parsed.length > 0) {
+              successCount++;
               const sensor = SENSORS.find(s => s.measurement === measurement);
               const key = sensor ? sensor.id : measurement;
               const entry = this.globalData.sensorData[key] || {};
               parsed.forEach(row => {
-                entry[row.field] = parseFloat(row.value);
+                entry[row.field] = row.value;
               });
               this.globalData.sensorData[key] = entry;
+            } else {
+              console.warn('[fetchData]', measurement, '200 OK 但无数据行，原始响应:', res.data.substring(0, 200));
+              this.globalData._lastError = measurement + ': 无数据（ESP32 可能未上报）';
             }
+          } else {
+            console.warn('[fetchData]', measurement, 'HTTP', res.statusCode, '原始响应:', res.data.substring(0, 200));
+            this.globalData._lastError = measurement + ': HTTP ' + res.statusCode;
           }
         },
         fail: (err) => {
+          const msg = (err && err.errMsg) ? err.errMsg : '请求被拦截或超时';
           console.error('fetch error for', measurement, err);
+          this.globalData._lastError = measurement + ': ' + msg;
         },
         complete: () => {
           completed++;
           if (completed === measurements.length) {
-            this.globalData.connected = true;
-            this.globalData.lastUpdate = new Date().toLocaleTimeString();
+            this.globalData.connected = successCount > 0;
+            if (successCount > 0) {
+              this.globalData.lastUpdate = new Date().toLocaleTimeString();
+            }
             this.notifyPages();
+            if (!this.globalData.connected) {
+              console.warn('[实时数据] 全部请求失败，最后错误:', this.globalData._lastError);
+            }
           }
         }
       });
@@ -67,8 +83,20 @@ App({
   },
 
   parseCSV(csv) {
-    const lines = csv.trim().split('\n');
+    const allLines = csv.trim().split('\n');
+    if (allLines.length < 2) return [];
+
+    // Skip InfluxDB annotation rows (lines starting with #)
+    let headerIdx = 0;
+    for (let i = 0; i < allLines.length; i++) {
+      if (!allLines[i].startsWith('#')) {
+        headerIdx = i;
+        break;
+      }
+    }
+    const lines = allLines.slice(headerIdx);
     if (lines.length < 2) return [];
+
     const headers = lines[0].split(',');
     const fieldIdx = headers.indexOf('_field');
     const valueIdx = headers.indexOf('_value');
@@ -77,9 +105,11 @@ App({
     const result = [];
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',');
+      const val = parseFloat(cols[valueIdx]);
+      if (isNaN(val)) continue;
       result.push({
         field: cols[fieldIdx],
-        value: cols[valueIdx]
+        value: val
       });
     }
     return result;
@@ -87,13 +117,14 @@ App({
 
   notifyPages() {
     const pages = getCurrentPages();
-    const currentPage = pages[pages.length - 1];
-    if (currentPage && currentPage.onSensorUpdate) {
-      currentPage.onSensorUpdate(
-        this.globalData.sensorData,
-        this.globalData.connected,
-        this.globalData.lastUpdate
-      );
+    for (let i = pages.length - 1; i >= 0; i--) {
+      if (pages[i] && pages[i]._onSensorUpdate) {
+        pages[i]._onSensorUpdate(
+          this.globalData.sensorData,
+          this.globalData.connected,
+          this.globalData.lastUpdate
+        );
+      }
     }
   },
 
@@ -103,7 +134,7 @@ App({
   |> range(start: -${range})
   |> filter(fn: (r) => ${measurementFilter})
   |> filter(fn: (r) => r._field == "${field}")
-  |> aggregateWindow(every: ${this.getWindow(range)}, fn: mean)`;
+  |> aggregateWindow(every: ${this.getWindow(range)}, fn: mean, createEmpty: false)`;
 
     wx.request({
       url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
@@ -132,11 +163,24 @@ App({
   getWindow(range) {
     if (range === '1h') return '1m';
     if (range === '6h') return '5m';
-    return '15m';
+    if (range === '24h') return '15m';
+    if (range === '7d') return '1h';
+    return '6h';
   },
 
   parseTimeCSV(csv, range) {
-    const lines = csv.trim().split('\n');
+    const allLines = csv.trim().split('\n');
+    if (allLines.length < 2) return [];
+
+    // Skip InfluxDB annotation rows (lines starting with #)
+    let headerIdx = 0;
+    for (let i = 0; i < allLines.length; i++) {
+      if (!allLines[i].startsWith('#')) {
+        headerIdx = i;
+        break;
+      }
+    }
+    const lines = allLines.slice(headerIdx);
     if (lines.length < 2) return [];
 
     const headers = lines[0].split(',');
@@ -145,9 +189,13 @@ App({
     const fieldIdx = headers.indexOf('_field');
     const valueIdx = headers.indexOf('_value');
 
-    if (timeIdx < 0 || valueIdx < 0) return [];
+    if (timeIdx < 0 || valueIdx < 0) {
+      console.warn('[parseTimeCSV] 缺少 _time/_value 列，跳过数据');
+      return [];
+    }
 
-    const is24h = range === '24h';
+    const isLong = range === '24h' || range === '7d';
+    const is30d = range === '30d';
 
     const result = [];
     for (let i = 1; i < lines.length; i++) {
@@ -156,7 +204,9 @@ App({
       let displayTime = timeStr;
       try {
         const d = new Date(timeStr);
-        if (is24h) {
+        if (is30d) {
+          displayTime = (d.getMonth() + 1) + '/' + d.getDate();
+        } else if (isLong) {
           displayTime = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
             String(d.getHours()).padStart(2, '0') + ':' +
             String(d.getMinutes()).padStart(2, '0');
@@ -176,12 +226,15 @@ App({
         }
       } catch (e) {}
 
+      const val = parseFloat(cols[valueIdx]);
+      if (isNaN(val)) continue;
+
       result.push({
         time: timeStr,
         displayTime: displayTime,
         sensor: cols[measurementIdx] || '',
         field: cols[fieldIdx] || '',
-        value: parseFloat(cols[valueIdx])
+        value: val
       });
     }
     return result;

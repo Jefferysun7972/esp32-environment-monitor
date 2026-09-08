@@ -1,7 +1,7 @@
 <view class="container">
   <view class="controls">
     <view class="section-title">时间范围</view>
-    <view class="chip-row">
+    <view class="chip-row wrap">
       <view
         wx:for="{{ranges}}"
         wx:key="key"
@@ -16,7 +16,7 @@
       <view
         class="chip temp-chip {{selectedMetric === 'temp' ? 'active' : ''}}"
         bindtap="onTempChipTap"
-      >温度 ▾</view>
+      >温度({{tempUnit}}) {{tempDropdownOpen ? '▴' : '▾'}}</view>
       <block wx:for="{{metrics}}" wx:key="key">
         <view
           wx:if="{{item.key !== 'temp'}}"
@@ -63,7 +63,7 @@
     <view class="section-title">统计摘要</view>
     <view class="stats-grid">
       <view class="stats-card" wx:for="{{sensors}}" wx:key="id" wx:if="{{showSensor[index]}}">
-        <text class="stats-sensor">{{item.label}}</text>
+        <text class="stats-sensor">{{item.label}} ({{metricUnit}})</text>
         <view class="stats-row">
           <view class="stats-item">
             <text class="stats-label">最小</text>
@@ -103,5 +103,42 @@
         <text wx:for="{{row.measurements}}" wx:key="*this" class="col-val">{{item !== null ? item : '--'}} {{metricUnit}}</text>
       </view>
     </scroll-view>
+  </view>
+
+  <view class="export-modal" wx:if="{{exportModalOpen}}" bindtap="onExportCancel">
+    <view class="export-modal-panel" catchtap="onExportModalNoop">
+      <view class="export-modal-title">选择导出指标</view>
+      <view class="export-modal-hint">可选多个指标，导出为单文件</view>
+      <view class="export-range-row">
+        <text class="export-range-label">时段：</text>
+        <view
+          wx:for="{{ranges}}"
+          wx:key="key"
+          class="export-range-chip {{exportRange === item.key ? 'active' : ''}}"
+          data-key="{{item.key}}"
+          bindtap="onExportRangeTap"
+        >{{item.label}}</view>
+      </view>
+      <scroll-view scroll-y class="export-modal-list">
+        <view
+          wx:for="{{exportMetrics}}"
+          wx:key="key"
+          class="export-item {{item.checked ? 'checked' : ''}}"
+          data-index="{{index}}"
+          bindtap="onExportMetricToggle"
+        >
+          <text class="export-checkbox">{{item.checked ? '☑' : '☐'}}</text>
+          <text class="export-item-label">{{item.label}}</text>
+          <text class="export-item-unit">{{item.unit}}</text>
+        </view>
+      </scroll-view>
+      <view class="export-modal-actions">
+        <text class="export-select-all" bindtap="onExportSelectAll">全选</text>
+        <view class="export-btns">
+          <text class="export-btn-cancel" bindtap="onExportCancel">取消</text>
+          <text class="export-btn-confirm" bindtap="onExportConfirm">{{exporting ? '导出中...' : '确认导出'}}</text>
+        </view>
+      </view>
+    </view>
   </view>
 </view>

@@ -43,6 +43,8 @@ const RANGES = [
   { key: '1h', label: '1小时' },
   { key: '6h', label: '6小时' },
   { key: '24h', label: '24小时' },
+  { key: '7d', label: '7天' },
+  { key: '30d', label: '30天' },
 ];
 
 Page({
@@ -61,7 +63,11 @@ Page({
     metricUnit: '°C',
     tempUnit: '°C',
     tempDropdownOpen: false,
-    showSensor: SENSORS.map(() => true)
+    showSensor: SENSORS.map(() => true),
+    exportModalOpen: false,
+    exportMetrics: [],
+    exportRange: '1h',
+    exporting: false
   },
 
   onLoad() {
@@ -104,7 +110,7 @@ Page({
 
   onRangeTap(e) {
     const key = e.currentTarget.dataset.key;
-    this.setData({ selectedRange: key });
+    this.setData({ selectedRange: key, tempDropdownOpen: false });
     this.loadData();
   },
 
@@ -140,7 +146,7 @@ Page({
     const toFahrenheit = isTemp && this.data.tempUnit === '°F';
 
     const convertVal = (v) => {
-      if (typeof v !== 'number') return v;
+      if (typeof v !== 'number' || isNaN(v)) return null;
       if (toFahrenheit) return Math.round((v * 9 / 5 + 32) * 10) / 10;
       return Math.round(v * 10) / 10;
     };
@@ -148,7 +154,7 @@ Page({
     const rounded = rawData.map(d => ({
       ...d,
       value: convertVal(d.value)
-    }));
+    })).filter(d => d.value !== null);
 
     // Group by displayTime for table
     const groupMap = {};
@@ -199,7 +205,11 @@ Page({
 
   drawChart(touchPoint) {
     const data = this.data.chartData;
-    if (!data || data.length === 0) return;
+    console.log('[drawChart] 调用, chartData 长度:', data ? data.length : 0, 'loading:', this.data.loading);
+    if (!data || data.length === 0) {
+      console.warn('[drawChart] 无数据，跳过绘制');
+      return;
+    }
 
     const query = wx.createSelectorQuery().in(this);
     query.select('#historyCanvas')
@@ -207,7 +217,11 @@ Page({
       .exec((res) => {
         if (!res || !res[0] || !res[0].node) {
           this._drawRetries = (this._drawRetries || 0) + 1;
-          if (this._drawRetries > 10) return;
+          if (this._drawRetries > 10) {
+            console.warn('[drawChart] Canvas 节点获取失败，已重试10次');
+            return;
+          }
+          console.warn('[drawChart] Canvas 节点未找到，第', this._drawRetries, '次重试');
           setTimeout(() => this.drawChart(touchPoint), 30);
           return;
         }
@@ -215,6 +229,8 @@ Page({
         const canvas = res[0].node;
         const W = this.data.canvasWidth;
         const H = this.data.canvasHeight;
+        console.log('[drawChart] Canvas 就绪, 尺寸:', W, 'x', H);
+
         const dpr = wx.getSystemInfoSync().pixelRatio;
 
         canvas.width = W * dpr;
@@ -223,11 +239,18 @@ Page({
         const ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
 
-        this.renderChart(ctx, data, W, H, touchPoint);
+        try {
+          this.renderChart(ctx, data, W, H, touchPoint);
+        } catch (e) {
+          console.error('[drawChart] renderChart 异常:', e);
+        }
       });
   },
 
   onCanvasTouch(e) {
+    if (this.data.tempDropdownOpen) {
+      this.setData({ tempDropdownOpen: false });
+    }
     const meta = this._chartMeta;
     if (!meta) return;
     const touch = e.touches[0];
@@ -287,6 +310,7 @@ Page({
     const ph = H - pad.t - pad.b;
 
     const series = SENSORS.map(s => data.filter(d => d.sensor === s.measurement));
+
     const ref = series.reduce((a, b) => a.length >= b.length ? a : b, series[0]);
     const N = Math.max(ref.length, 1);
 
@@ -295,7 +319,12 @@ Page({
       if (this.data.showSensor[i]) visible.push(...series[i]);
     });
     const vals = visible.length > 0 ? visible.map(d => d.value) : data.map(d => d.value);
-    let minV = Math.min(...vals), maxV = Math.max(...vals);
+    const cleanVals = vals.filter(v => typeof v === 'number' && !isNaN(v));
+    if (cleanVals.length === 0) {
+      console.warn('[renderChart] 无有效数值，跳过绘制');
+      return;
+    }
+    let minV = Math.min(...cleanVals), maxV = Math.max(...cleanVals);
     if (minV === maxV) { minV -= 1; maxV += 1; }
     const rng = maxV - minV;
     minV -= rng * 0.08;
@@ -363,7 +392,8 @@ Page({
     }
 
     // X-axis labels
-    const isLongRange = this.data.selectedRange === '24h';
+    const isLongRange = this.data.selectedRange === '24h' || this.data.selectedRange === '7d';
+    const is30d = this.data.selectedRange === '30d';
     const labelMax = Math.min(5, N);
     const labelStep = Math.max(1, Math.ceil(N / labelMax));
     ctx.textAlign = 'center';
@@ -436,8 +466,11 @@ Page({
     };
 
     const colors = [metric.color1, metric.color2];
+
     SENSORS.forEach((s, i) => {
-      if (this.data.showSensor[i]) drawSeries(series[i], colors[i]);
+      if (this.data.showSensor[i]) {
+        drawSeries(series[i], colors[i]);
+      }
     });
 
     // Legend with counts (tap to toggle)
@@ -523,21 +556,121 @@ Page({
   },
 
   onExportCsv() {
-    const { tableData, metricUnit } = this.data;
+    const { tableData, metrics, selectedRange } = this.data;
     if (!tableData || tableData.length === 0) return;
-    const unit = metricUnit || '';
 
-    const headers = SENSORS.map(s => s.label + '(' + unit + ')').join(',');
-    let csv = '\uFEFF时间,' + headers + '\n';
-    tableData.forEach(row => {
-      const vals = row.measurements.map(v => v !== null ? v : '').join(',');
-      csv += row.displayTime + ',' + vals + '\n';
+    const exportMetrics = metrics
+      .filter(m => m.supported)
+      .map(m => ({ ...m, checked: m.key === this.data.selectedMetric }));
+    this.setData({ exportModalOpen: true, exportMetrics, exportRange: selectedRange });
+  },
+
+  onExportMetricToggle(e) {
+    const idx = e.currentTarget.dataset.index;
+    const exportMetrics = [...this.data.exportMetrics];
+    exportMetrics[idx].checked = !exportMetrics[idx].checked;
+    this.setData({ exportMetrics });
+  },
+
+  onExportSelectAll() {
+    const exportMetrics = this.data.exportMetrics.map(m => ({ ...m, checked: true }));
+    this.setData({ exportMetrics });
+  },
+
+  onExportCancel() {
+    this.setData({ exportModalOpen: false });
+  },
+
+  onExportRangeTap(e) {
+    this.setData({ exportRange: e.currentTarget.dataset.key });
+  },
+
+  onExportModalNoop() {},
+
+  onExportConfirm() {
+    const selected = this.data.exportMetrics.filter(m => m.checked);
+    if (selected.length === 0) {
+      wx.showToast({ title: '请至少选择一个指标', icon: 'none' });
+      return;
+    }
+
+    this.setData({ exporting: true });
+    const app = getApp();
+    const range = this.data.exportRange;
+    let completed = 0;
+    const allData = [];
+
+    selected.forEach(m => {
+      app.fetchHistory(range, m.key, (err, data) => {
+        completed++;
+        if (!err && data && data.length > 0) {
+          allData.push({ metric: m, data: data });
+        }
+        if (completed === selected.length) {
+          this._generateExportCsv(allData);
+        }
+      });
+    });
+  },
+
+  _generateExportCsv(metricDataList) {
+    this.setData({ exporting: false, exportModalOpen: false });
+
+    if (metricDataList.length === 0) {
+      wx.showToast({ title: '无数据可导出', icon: 'none' });
+      return;
+    }
+
+    const { exportRange } = this.data;
+
+    const timeMap = {};
+    metricDataList.forEach(({ metric, data }) => {
+      data.forEach(d => {
+        if (!timeMap[d.displayTime]) {
+          timeMap[d.displayTime] = { displayTime: d.displayTime };
+        }
+        SENSORS.forEach(s => {
+          if (d.sensor === s.measurement) {
+            timeMap[d.displayTime][`${s.label}_${metric.key}`] = d.value;
+          }
+        });
+      });
     });
 
-    wx.setClipboardData({
-      data: csv,
-      success: () => {
-        wx.showToast({ title: 'CSV 已复制到剪贴板', icon: 'success' });
+    const times = Object.keys(timeMap).sort();
+    const columns = [];
+    metricDataList.forEach(({ metric }) => {
+      SENSORS.forEach(s => {
+        columns.push(`${s.label} ${metric.label}(${metric.unit})`);
+      });
+    });
+
+    let csv = '\uFEFF时间,' + columns.join(',') + '\n';
+    times.forEach(t => {
+      const row = timeMap[t];
+      const vals = [];
+      metricDataList.forEach(({ metric }) => {
+        SENSORS.forEach(s => {
+          const key = `${s.label}_${metric.key}`;
+          const v = row[key];
+          vals.push(v !== undefined && v !== null && !isNaN(v) ? v : '');
+        });
+      });
+      csv += row.displayTime + ',' + vals.join(',') + '\n';
+    });
+
+    const fs = wx.getFileSystemManager();
+    const metricKeys = metricDataList.map(m => m.metric.key).join('_');
+    const fileName = `sensor_${metricKeys}_${exportRange}_${Date.now()}.csv`;
+    const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`;
+    fs.writeFileSync(filePath, csv, 'utf8');
+
+    wx.shareFileMessage({
+      filePath: filePath,
+      fileName: fileName,
+      success: () => {},
+      fail: (err) => {
+        wx.showToast({ title: '导出失败: ' + (err.errMsg || ''), icon: 'none' });
       }
     });
   }

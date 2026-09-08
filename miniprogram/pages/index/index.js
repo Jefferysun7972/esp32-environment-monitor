@@ -10,7 +10,7 @@ Page({
 
   onLoad() {
     const app = getApp();
-    this.onSensorUpdate = (data, connected, lastUpdate) => {
+    this._onSensorUpdate = (data, connected, lastUpdate) => {
       this.setData({
         sensorData: data,
         connected: connected,
@@ -26,6 +26,16 @@ Page({
     this._buildCards(app.globalData.sensorData);
   },
 
+  onShow() {
+    const app = getApp();
+    this.setData({
+      sensorData: app.globalData.sensorData,
+      connected: app.globalData.connected,
+      lastUpdate: app.globalData.lastUpdate || ''
+    });
+    this._buildCards(app.globalData.sensorData);
+  },
+
   _buildCards(sensorData) {
     const cards = SENSORS.map(s => {
       const data = sensorData[s.id] || {};
@@ -34,7 +44,7 @@ Page({
         label: FIELD_LABELS[f] || f,
         unit: FIELD_UNITS[f] || '',
         cssClass: FIELD_CSS_CLASS[f] || '',
-        value: data[f] !== undefined ? data[f] : '--'
+        value: data[f] !== undefined && data[f] !== null && !isNaN(data[f]) ? data[f] : '--'
       }));
 
       // Split metrics into rows according to rowLayout
