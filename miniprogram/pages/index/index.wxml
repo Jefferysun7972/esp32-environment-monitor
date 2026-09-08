@@ -9,10 +9,10 @@
         <text class="status-text">{{connected ? '在线' : '离线'}}</text>
         <text class="update-text" wx:if="{{lastUpdate}}">{{lastUpdate}} 更新</text>
         <text class="cache-badge" wx:if="{{dataCached}}">缓存</text>
-        <view class="temp-toggle {{isFahrenheit ? 'active' : ''}}" bindtap="onTempUnitToggle">
-          <text class="temp-toggle-label">°C</text>
+        <view class="temp-toggle" bindtap="onTempUnitToggle">
+          <text class="temp-toggle-label {{isFahrenheit ? '' : 'active'}}">°C</text>
           <text class="temp-toggle-divider">/</text>
-          <text class="temp-toggle-label">°F</text>
+          <text class="temp-toggle-label {{isFahrenheit ? 'active' : ''}}">°F</text>
         </view>
       </view>
     </view>
