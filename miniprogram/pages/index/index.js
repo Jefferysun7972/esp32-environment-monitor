@@ -1,5 +1,20 @@
 const { FIELD_LABELS, FIELD_UNITS, FIELD_CSS_CLASS } = require('../../config/sensors');
 
+// 阈值定义：{ key: [warn_value, danger_value] }
+const THRESHOLDS = {
+  temp: [26, 35],
+  humi: [70, 90],
+  pm1: [25, 50],
+  pm25: [35, 75],
+  pm10: [50, 150],
+  tvoc: [500, 1000],
+  hcho: [100, 200],
+  no2: [100, 200],
+  nox: [100, 200],
+  co2: [1000, 2000],
+  pressure: [1000, 1030]
+};
+
 Page({
   data: {
     sensorData: {},
@@ -70,13 +85,24 @@ Page({
     const cards = sensors.map(s => {
       const data = sensorData[s.id] || {};
       const fields = Object.keys(data);
-      const allMetrics = fields.map(f => ({
-        key: f,
-        label: FIELD_LABELS[f] || f,
-        unit: FIELD_UNITS[f] || '',
-        cssClass: FIELD_CSS_CLASS[f] || '',
-        value: data[f] !== undefined && data[f] !== null && !isNaN(data[f]) ? data[f] : '--'
-      }));
+      const allMetrics = fields.map(f => {
+        const rawVal = data[f];
+        const val = rawVal !== undefined && rawVal !== null && !isNaN(rawVal) ? rawVal : null;
+        let status = '';
+        if (val !== null && THRESHOLDS[f]) {
+          const [warn, danger] = THRESHOLDS[f];
+          if (val >= danger) status = 'danger';
+          else if (val >= warn) status = 'warn';
+        }
+        return {
+          key: f,
+          label: FIELD_LABELS[f] || f,
+          unit: FIELD_UNITS[f] || '',
+          cssClass: FIELD_CSS_CLASS[f] || '',
+          value: val !== null ? val : '--',
+          status: status
+        };
+      });
 
       const rows = [];
       const perRow = 3;

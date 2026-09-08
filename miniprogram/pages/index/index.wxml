@@ -37,7 +37,7 @@
     </view>
 
     <view class="grid {{row.cols === 2 ? 'grid-2' : 'grid-3'}}" wx:for="{{item.rows}}" wx:for-item="row" wx:key="rowKey">
-      <view class="metric" wx:for="{{row.metrics}}" wx:for-item="m" wx:key="key">
+      <view class="metric {{m.status}}" wx:for="{{row.metrics}}" wx:for-item="m" wx:key="key">
         <text class="metric-label">{{m.label}}</text>
         <text class="metric-value {{m.cssClass}}">{{m.value}}<text class="metric-unit">{{m.unit}}</text></text>
       </view>

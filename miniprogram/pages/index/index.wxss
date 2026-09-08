@@ -203,6 +203,23 @@
   background: #f8f9fa;
   border-radius: 16rpx;
   padding: 20rpx 8rpx;
+  transition: all 0.3s ease;
+}
+
+.metric.warn {
+  background: #fff8e1;
+  box-shadow: 0 0 0 2rpx #ffc107 inset;
+}
+
+.metric.danger {
+  background: #ffebee;
+  box-shadow: 0 0 0 2rpx #f44336 inset;
+  animation: danger-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes danger-pulse {
+  0%, 100% { box-shadow: 0 0 0 2rpx #f44336 inset; }
+  50% { box-shadow: 0 0 0 4rpx rgba(244, 67, 54, 0.4) inset; }
 }
 
 .metric-label {
