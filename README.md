@@ -36,6 +36,11 @@
 - **Data Table**: Time-grouped detail view showing both sensors side by side
 - **Canvas 2D Rendering**: Hardware-accelerated charts with DPR-aware sharp rendering
 - **Segment Control**: Toggle between metrics and time ranges instantly
+- **Dark Mode**: Full dark theme support with smooth CSS transition animation
+- **System Theme Follow**: Auto-detect system dark mode via `wx.onThemeChange`
+- **Custom Accent Color**: 6 accent colors to personalize the UI
+- **High Contrast Mode**: Accessibility mode for visually impaired users
+- **Settings Page**: Theme, temperature unit (°C/°F), accent color, and system info
 
 ### 🔔 Smart Alert System
 - **3-Color Level**: BLUE (Normal) → ORANGE (Warning) → RED (Danger)
@@ -281,18 +286,24 @@ The system supports multiple display modes selected automatically based on detec
 ### Project Structure
 ```
 miniprogram/
-├── app.js              # App entry, InfluxDB API client
+├── app.js              # App entry, InfluxDB API client, theme & settings management
 ├── app.json            # Page routes & tab bar config
-├── app.wxss            # Global styles
+├── app.wxss            # Global styles, theme transitions, dark mode
+├── config/
+│   └── sensors.js      # Sensor field labels, units, thresholds, fallback config
 ├── pages/
 │   ├── index/          # Real-time dashboard
 │   │   ├── index.js
 │   │   ├── index.wxml
 │   │   └── index.wxss
-│   └── history/        # Historical charts
-│       ├── history.js
-│       ├── history.wxml
-│       └── history.wxss
+│   ├── history/        # Historical charts
+│   │   ├── history.js
+│   │   ├── history.wxml
+│   │   └── history.wxss
+│   └── settings/       # App settings
+│       ├── settings.js
+│       ├── settings.wxml
+│       └── settings.wxss
 └── utils/
 ```
 
@@ -314,6 +325,7 @@ const INFLUXDB_TOKEN = 'your_api_token';
 |------|-------|-------------|
 | **实时数据** | `pages/index/index` | Latest readings from both sensors, auto-refresh |
 | **历史曲线** | `pages/history/history` | Time-series charts with metric/time-range selectors |
+| **设置** | `pages/settings/settings` | Theme, temperature unit, accent color, system info |
 
 ### Historical Chart Features
 - **Time Ranges**: 1 hour / 6 hours / 24 hours (InfluxDB aggregateWindow)
@@ -321,15 +333,9 @@ const INFLUXDB_TOKEN = 'your_api_token';
 - **Dual Curves**: AM2020DY (solid) vs SEN68 (dashed), with legend showing data point counts
 - **Y-axis Unit Labels**: Auto-appended units (°C, %, µg/m³, ppb)
 - **Data Table**: Grouped by time, showing both sensors' values per row
-
-### Upcoming (v1.3.0)
-- Statistical summary (min / max / average)
-- Touch tooltip with crosshair
-- Threshold reference lines
-- CSV data export
-- Bezier curve smoothing
-- Pull-to-refresh
-- Toggleable legend
+- **Touch Tooltip**: Crosshair and tooltip on touch interaction
+- **Pull-to-Refresh**: Swipe down to refresh chart data
+- **Temperature Unit Toggle**: Switch between °C and °F
 
 ---
 
@@ -344,8 +350,11 @@ const INFLUXDB_TOKEN = 'your_api_token';
 ### v1.2.0 ✅
 - WeChat Mini Program: real-time dashboard, historical charts, dual-sensor comparison, Canvas 2D rendering
 
-### v1.3.0 (Planned)
-- Statistical summary, touch tooltip, threshold reference lines, CSV export, curve smoothing, pull-to-refresh, toggleable legend
+### v1.3.0 ✅
+- Dark mode with smooth transition animation, system theme auto-follow, custom accent colors, high contrast accessibility mode, settings page, touch tooltip, pull-to-refresh, temperature unit toggle, performance optimization (async non-blocking startup)
+
+### v1.4.0 (Planned)
+- Statistical summary (min / max / average), threshold reference lines, CSV data export, Bezier curve smoothing, toggleable legend
 
 ---
 
@@ -363,4 +372,4 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-**Last Updated**: 2026-09-03 | **Maintainer**: [Jefferysun7972](https://github.com/Jefferysun7972)
+**Last Updated**: 2026-09-09 | **Maintainer**: [Jefferysun7972](https://github.com/Jefferysun7972)
