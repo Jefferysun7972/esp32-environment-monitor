@@ -1,12 +1,63 @@
-<view class="container {{pageTheme === 'dark' ? 'theme-dark' : ''}}">
+<view class="container {{pageTheme === 'dark' ? 'theme-dark' : ''}} {{highContrast ? 'high-contrast' : ''}}"
+      style="background: {{pageTheme === 'dark' ? '#1a1a2e' : '#f5f5f5'}};">
+  <view class="header">
+    <view class="header-bg" style="background: {{pageTheme === 'dark' ? 'linear-gradient(135deg, #0d47a1 0%, #0a0a1a 100%)' : 'linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%)'}};"></view>
+    <view class="header-content">
+      <text class="header-title">设置</text>
+      <text class="header-subtitle">{{themeLabel}} · {{tempUnitLabel}}</text>
+    </view>
+  </view>
+
   <view class="section">
     <view class="section-title">外观</view>
     <view class="setting-item">
       <view class="setting-info">
+        <text class="setting-label">跟随系统</text>
+        <text class="setting-desc">自动匹配系统深色/浅色模式</text>
+      </view>
+      <switch checked="{{rawTheme === 'auto'}}" bindchange="onAutoThemeChange" color="{{accentColor}}"/>
+    </view>
+    <view class="setting-item" wx:if="{{rawTheme !== 'auto'}}">
+      <view class="setting-info">
         <text class="setting-label">深色模式</text>
         <text class="setting-desc">切换深色/浅色主题</text>
       </view>
-      <switch checked="{{theme === 'dark'}}" bindchange="onThemeChange" color="#1a73e8"/>
+      <switch checked="{{theme === 'dark'}}" bindchange="onThemeChange" color="{{accentColor}}"/>
+    </view>
+    <view class="setting-item setting-item-vertical" wx:if="{{rawTheme === 'auto'}}">
+      <view class="setting-info">
+        <text class="setting-label">当前模式</text>
+        <text class="setting-desc">{{theme === 'dark' ? '深色模式（跟随系统）' : '浅色模式（跟随系统）'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">强调色</view>
+    <view class="setting-item setting-item-vertical">
+      <view class="color-grid">
+        <view 
+          wx:for="{{accentColors}}" 
+          wx:key="value"
+          class="color-item {{accentColor === item.value ? 'active' : ''}}"
+          style="background: {{item.value}};"
+          data-color="{{item.value}}"
+          bindtap="onAccentColorTap"
+        >
+          <view class="color-check" wx:if="{{accentColor === item.value}}">✓</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">辅助功能</view>
+    <view class="setting-item">
+      <view class="setting-info">
+        <text class="setting-label">高对比度</text>
+        <text class="setting-desc">增强文字与背景对比度</text>
+      </view>
+      <switch checked="{{highContrast}}" bindchange="onHighContrastChange" color="{{accentColor}}"/>
     </view>
   </view>
 
@@ -17,7 +68,7 @@
         <text class="setting-label">{{isFahrenheit ? '华氏度 (°F)' : '摄氏度 (°C)'}}</text>
         <text class="setting-desc">当前温度单位为{{isFahrenheit ? '华氏度' : '摄氏度'}}</text>
       </view>
-      <switch checked="{{isFahrenheit}}" bindchange="onTempUnitChange" color="#1a73e8"/>
+      <switch checked="{{isFahrenheit}}" bindchange="onTempUnitChange" color="{{accentColor}}"/>
     </view>
   </view>
 
@@ -26,7 +77,7 @@
     <view class="setting-item">
       <view class="setting-info">
         <text class="setting-label">传感器对比测试</text>
-        <text class="setting-desc">版本 1.3.0 · 全自动传感器发现</text>
+        <text class="setting-desc">版本 1.4.0 · 主题增强版</text>
       </view>
     </view>
     <view class="setting-item">

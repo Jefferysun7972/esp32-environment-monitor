@@ -1,17 +1,73 @@
-.container {
-  min-height: 100vh;
+page {
   background: #f5f5f5;
-  padding: 24rpx;
 }
 
+.container {
+  background: #f5f5f5;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-bottom: 60rpx;
+  box-sizing: border-box;
+}
+
+/* Header */
+.header {
+  position: relative;
+  padding: 120rpx 40rpx 40rpx;
+  margin: 0 -24rpx 24rpx;
+  overflow: hidden;
+}
+
+.header-bg {
+  position: absolute;
+  top: -80rpx;
+  left: -40rpx;
+  right: -40rpx;
+  bottom: 0;
+  background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+  border-radius: 0 0 60rpx 60rpx;
+}
+
+.header-content {
+  position: relative;
+  z-index: 1;
+}
+
+.header-title {
+  display: block;
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 4rpx;
+}
+
+.header-subtitle {
+  display: block;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 6rpx;
+  letter-spacing: 2rpx;
+}
+
+/* 设置页面深色模式 - 使用更高优先级选择器覆盖全局样式 */
+page .container.theme-dark,
 .container.theme-dark {
-  background: #1a1a2e;
+  background: #1a1a2e !important;
+}
+
+.theme-dark .header-bg {
+  background: linear-gradient(135deg, #0d47a1 0%, #0a0a1a 100%);
+}
+
+.theme-dark .header-title,
+.theme-dark .header-subtitle {
+  color: #e0e0e0;
 }
 
 .section {
   background: #fff;
   border-radius: 16rpx;
-  margin-bottom: 24rpx;
+  margin: 0 24rpx 24rpx;
   overflow: hidden;
   box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
 }
@@ -37,6 +93,11 @@
   justify-content: space-between;
   padding: 24rpx;
   border-bottom: 1rpx solid #f0f0f0;
+}
+
+.setting-item-vertical {
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .container.theme-dark .setting-item {
@@ -93,4 +154,67 @@
 
 .share-btn::after {
   border: none;
+}
+
+/* 颜色选择器 */
+.color-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+  padding: 12rpx 0;
+}
+
+.color-item {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.color-item:active {
+  transform: scale(0.92);
+}
+
+.color-item.active {
+  box-shadow: 0 0 0 4rpx #fff, 0 0 0 8rpx currentColor;
+}
+
+.color-check {
+  color: #fff;
+  font-size: 28rpx;
+  font-weight: bold;
+  text-shadow: 0 1rpx 2rpx rgba(0, 0, 0, 0.3);
+}
+
+/* 高对比度模式 */
+.container.high-contrast .setting-label {
+  color: #000;
+  font-weight: 600;
+}
+
+.container.theme-dark.high-contrast .setting-label {
+  color: #fff;
+  font-weight: 600;
+}
+
+.container.high-contrast .setting-desc {
+  color: #555;
+}
+
+.container.theme-dark.high-contrast .setting-desc {
+  color: #bbb;
+}
+
+.container.high-contrast .section-title {
+  color: #333;
+  font-weight: 600;
+}
+
+.container.theme-dark.high-contrast .section-title {
+  color: #ccc;
+  font-weight: 600;
 }

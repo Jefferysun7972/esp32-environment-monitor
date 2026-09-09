@@ -3,21 +3,55 @@ page {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-page.theme-dark {
-  background-color: #1a1a2e;
+/* 全局主题切换动画 */
+.container,
+.container .section,
+.container .card,
+.container .metric,
+.container .controls,
+.container .chart-container,
+.container .stats-bar,
+.container .stats-card,
+.container .chip,
+.container .filter-chip,
+.container .setting-item,
+.container .header-bg,
+.container .temp-toggle,
+.container .overlay {
+  transition: background 0.35s ease, background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
-.theme-dark .container {
-  background: linear-gradient(180deg, #16213e 0%, #1a1a2e 30%);
+.container .section-title,
+.container .setting-label,
+.container .setting-desc,
+.container .metric-label,
+.container .metric-value,
+.container .metric-unit,
+.container .card-title,
+.container .card-header,
+.container .header-title,
+.container .header-subtitle,
+.container .status-text,
+.container .update-text,
+.container .footer-text,
+.container .pull-hint-text,
+.container .setting-arrow {
+  transition: color 0.35s ease;
+}
+
+/* 全局深色模式优化 - 基础样式，会被页面样式覆盖 */
+.container.theme-dark {
+  background: #1a1a2e;
 }
 
 .theme-dark .card {
   background: #252540;
-  box-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.4);
 }
 
 .theme-dark .metric {
   background: #2a2a45;
+  border-radius: 16rpx;
 }
 
 .theme-dark .metric-label {
@@ -26,4 +60,57 @@ page.theme-dark {
 
 .theme-dark .metric-value {
   color: #e0e0e0;
+}
+
+/* 深色模式下滚动条样式 */
+::-webkit-scrollbar {
+  width: 6rpx;
+  height: 6rpx;
+}
+
+.theme-dark ::-webkit-scrollbar-track {
+  background: #1a1a2e;
+}
+
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3rpx;
+}
+
+.theme-dark ::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* 深色模式下选中文本颜色 */
+.theme-dark ::selection {
+  background: rgba(26, 115, 232, 0.3);
+  color: #fff;
+}
+
+/* 高对比度模式 - 全局 */
+.container.high-contrast .card,
+.container.high-contrast .metric,
+.container.high-contrast .controls,
+.container.high-contrast .chart-container,
+.container.high-contrast .stats-bar,
+.container.high-contrast .stats-card {
+  border: 2rpx solid #666;
+}
+
+.container.theme-dark.high-contrast .card,
+.container.theme-dark.high-contrast .metric,
+.container.theme-dark.high-contrast .controls,
+.container.theme-dark.high-contrast .chart-container,
+.container.theme-dark.high-contrast .stats-bar,
+.container.theme-dark.high-contrast .stats-card {
+  border: 2rpx solid #888;
+}
+
+.container.high-contrast .filter-chip.active,
+.container.high-contrast .chip.active {
+  font-weight: 700;
+}
+
+.container.high-contrast .metric-value {
+  font-weight: 700;
 }

@@ -9,7 +9,11 @@ Page({
     lastUpdate: '',
     dataCached: false,
     isFahrenheit: false,
-    pageTheme: 'light'
+    pageTheme: 'light',
+    highContrast: false,
+    accentColor: '#1a73e8',
+    isLoading: true,  // ✨ 添加加载状态
+    isFirstLoad: true // ✨ 标记是否首次加载
   },
 
   _getSensors() {
@@ -19,6 +23,13 @@ Page({
 
   onLoad() {
     const app = getApp();
+    
+    const isDark = app.getTheme() === 'dark';
+    
+    this.setData({ pageTheme: isDark ? 'dark' : 'light' });
+    
+    this._applyPageBackground(isDark);
+    
     this._onSensorUpdate = (data, connected, lastUpdate) => {
       const app = getApp();
       this.setData({
@@ -27,7 +38,10 @@ Page({
         lastUpdate: lastUpdate || '',
         dataCached: app.globalData.dataCached || false,
         isFahrenheit: app.getTempUnit(),
-        pageTheme: app.getTheme()
+        pageTheme: app.getTheme(),
+        highContrast: app.isHighContrast(),
+        accentColor: app.getAccentColor(),
+        isLoading: false  // ✨ 数据加载完成
       });
       this._buildCards(data, this.data.sensorFilters);
     };
@@ -47,6 +61,12 @@ Page({
 
   onShow() {
     const app = getApp();
+    
+    const isDark = app.getTheme() === 'dark';
+    const theme = isDark ? 'dark' : 'light';
+    
+    this._applyPageBackground(isDark);
+    
     const sensors = this._getSensors();
     const filters = (this.data.sensorFilters.length === sensors.length && sensors.length > 0)
       ? this.data.sensorFilters
@@ -64,19 +84,12 @@ Page({
       lastUpdate: app.globalData.lastUpdate || '',
       dataCached: app.globalData.dataCached || false,
       isFahrenheit: app.getTempUnit(),
-      pageTheme: app.getTheme()
+      pageTheme: theme,
+      highContrast: app.isHighContrast(),
+      accentColor: app.getAccentColor(),
+      isLoading: false  // ✨ 数据加载完成
     });
-    this._syncTabBar(app.getTheme());
     this._buildCards(app.globalData.sensorData, filters);
-  },
-
-  _syncTabBar(theme) {
-    wx.setTabBarStyle({
-      color: theme === 'dark' ? '#777' : '#999',
-      selectedColor: '#1a73e8',
-      backgroundColor: theme === 'dark' ? '#1a1a2e' : '#fff',
-      borderStyle: theme === 'dark' ? 'white' : 'black'
-    });
   },
 
   _buildCards(sensorData, sensorFilters) {
@@ -149,12 +162,28 @@ Page({
     setTimeout(() => wx.stopPullDownRefresh(), 1000);
   },
 
-  onTempUnitToggle() {
-    const app = getApp();
-    const isFahrenheit = !app.getTempUnit();
-    app.setTempUnit(isFahrenheit);
-    this.setData({ isFahrenheit });
-    this._buildCards(this.data.sensorData, this.data.sensorFilters);
+  _applyPageBackground(isDark) {
+    const bgColor = isDark ? '#1a1a2e' : '#f5f5f5';
+    
+    // 注意：导航栏颜色由 app.js 统一管理，避免重复设置导致闪烁
+    
+    // 设置页面根元素背景色
+    if (wx.setBackgroundColor) {
+      wx.setBackgroundColor({
+        backgroundColor: bgColor,
+        backgroundColorTop: bgColor,
+        backgroundColorBottom: bgColor
+      });
+    }
+
+    // 设置 page 元素样式，确保背景色正确
+    if (wx.setPageStyle) {
+      wx.setPageStyle({
+        style: {
+          background: bgColor
+        }
+      });
+    }
   },
 
   onShareAppMessage() {

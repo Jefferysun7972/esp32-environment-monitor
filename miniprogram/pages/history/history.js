@@ -44,7 +44,9 @@ Page({
     exportMetrics: [],
     exportRange: '1h',
     exporting: false,
-    pageTheme: 'light'
+    pageTheme: 'light',
+    highContrast: false,
+    accentColor: '#1a73e8'
   },
 
   _getSensors() {
@@ -58,13 +60,21 @@ Page({
     const sysInfo = wx.getSystemInfoSync();
     const sensors = this._getSensors();
     const isFahrenheit = app.getTempUnit();
+    const isDark = app.getTheme() === 'dark';
+    
     this.setData({
       canvasWidth: sysInfo.windowWidth - 48,
       sensors: sensors,
       showSensor: sensors.map(() => true),
       tempUnit: isFahrenheit ? '°F' : '°C',
-      pageTheme: app.getTheme()
+      pageTheme: isDark ? 'dark' : 'light',
+      highContrast: app.isHighContrast(),
+      accentColor: app.getAccentColor()
     });
+    
+    this._updateHeaderLabels();
+    
+    this._applyPageBackground(isDark);
 
     this._onSensorUpdate = () => {
       const sensors = this._getSensors();
@@ -122,33 +132,34 @@ Page({
     });
 
     this.setData({ metrics });
+    this._updateHeaderLabels();
   },
 
   onShow() {
     const app = getApp();
+    
+    const isDark = app.getTheme() === 'dark';
+    
+    this.setData({
+      pageTheme: isDark ? 'dark' : 'light',
+      highContrast: app.isHighContrast(),
+      accentColor: app.getAccentColor()
+    });
+    
+    this._applyPageBackground(isDark);
+    
     const sensors = this._getSensors();
     if (sensors.length > 0 && this.data.sensors.length !== sensors.length) {
       this.setData({ sensors, showSensor: sensors.map(() => true) });
     }
     const isFahrenheit = app.getTempUnit();
     this.setData({
-      pageTheme: app.getTheme(),
       tempUnit: isFahrenheit ? '°F' : '°C'
     });
-    this._syncTabBar(app.getTheme());
     this._buildMetrics();
     if (this.data.chartData) {
       setTimeout(() => this.drawChart(), 50);
     }
-  },
-
-  _syncTabBar(theme) {
-    wx.setTabBarStyle({
-      color: theme === 'dark' ? '#777' : '#999',
-      selectedColor: '#1a73e8',
-      backgroundColor: theme === 'dark' ? '#1a1a2e' : '#fff',
-      borderStyle: theme === 'dark' ? 'white' : 'black'
-    });
   },
 
   onPullDownRefresh() {
@@ -157,17 +168,28 @@ Page({
     });
   },
 
+  _updateHeaderLabels() {
+    const metric = this.data.metrics.find(m => m.key === this.data.selectedMetric);
+    const range = RANGES.find(r => r.key === this.data.selectedRange);
+    this.setData({
+      selectedMetricLabel: metric ? metric.label : this.data.selectedMetric,
+      selectedRangeLabel: range ? range.label : this.data.selectedRange
+    });
+  },
+
   onMetricTap(e) {
     const key = e.currentTarget.dataset.key;
     const metric = this.data.metrics.find(m => m.key === key);
     if (!metric || !metric.supported) return;
     this.setData({ selectedMetric: key, tempDropdownOpen: false });
+    this._updateHeaderLabels();
     this.loadData();
   },
 
   onRangeTap(e) {
     const key = e.currentTarget.dataset.key;
     this.setData({ selectedRange: key, tempDropdownOpen: false });
+    this._updateHeaderLabels();
     this.loadData();
   },
 
@@ -816,6 +838,41 @@ Page({
         wx.showToast({ title: '导出失败: ' + (err.errMsg || ''), icon: 'none' });
       }
     });
+  },
+
+  _applyPageBackground(isDark) {
+    const bgColor = isDark ? '#1a1a2e' : '#f5f5f5';
+    
+    // 注意：导航栏颜色由 app.js 统一管理，避免重复设置导致闪烁
+    
+    // 设置页面根元素背景色
+    if (wx.setBackgroundColor) {
+      wx.setBackgroundColor({
+        backgroundColor: bgColor,
+        backgroundColorTop: bgColor,
+        backgroundColorBottom: bgColor
+      });
+    }
+    
+    // 设置 page 元素样式，确保背景色正确
+    if (wx.setPageStyle) {
+      wx.setPageStyle({
+        style: {
+          background: bgColor
+        }
+      });
+      
+      // 额外：延迟再次设置，确保样式生效
+      setTimeout(() => {
+        if (wx.setPageStyle) {
+          wx.setPageStyle({
+            style: {
+              background: bgColor
+            }
+          });
+        }
+      }, 100);
+    }
   },
 
   onShareAppMessage() {

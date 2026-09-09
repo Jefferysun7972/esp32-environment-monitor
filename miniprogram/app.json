@@ -7,7 +7,9 @@
   "window": {
     "navigationBarTitleText": "传感器对比测试",
     "navigationBarBackgroundColor": "#1a73e8",
-    "navigationBarTextStyle": "white"
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f5f5",
+    "backgroundTextStyle": "dark"
   },
   "tabBar": {
     "color": "#999",
