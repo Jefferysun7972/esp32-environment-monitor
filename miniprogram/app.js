@@ -92,8 +92,12 @@ App({
       // 异步发现传感器（后台）
       this.discoverSensors((sensors) => {
         if (sensors && sensors.length > 0) {
-          console.log('[App] 发现到新传感器，更新列表');
-          this.fetchData();
+          const existingIds = this.globalData.sensors.map(s => s.id).sort().join(',');
+          const newIds = sensors.map(s => s.id).sort().join(',');
+          if (existingIds !== newIds) {
+            console.log('[App] 发现到新传感器，更新列表');
+            this.fetchData();
+          }
         }
       });
     }, 500); // 延迟500ms，确保页面已渲染
@@ -218,8 +222,8 @@ App({
     // 如果设置为 auto，检测当前系统主题
     let effectiveTheme = theme;
     if (theme === 'auto') {
-      const sysInfo = wx.getSystemInfoSync();
-      effectiveTheme = sysInfo.theme === 'dark' ? 'dark' : 'light';
+      const appBaseInfo = wx.getAppBaseInfo();
+      effectiveTheme = appBaseInfo.theme === 'dark' ? 'dark' : 'light';
     }
     
     this._applyTheme(effectiveTheme);
@@ -229,8 +233,8 @@ App({
   getTheme() {
     // 如果主题是 auto，返回实际生效的主题
     if (this.globalData.theme === 'auto') {
-      const sysInfo = wx.getSystemInfoSync();
-      return sysInfo.theme === 'dark' ? 'dark' : 'light';
+      const appBaseInfo = wx.getAppBaseInfo();
+      return appBaseInfo.theme === 'dark' ? 'dark' : 'light';
     }
     return this.globalData.theme;
   },

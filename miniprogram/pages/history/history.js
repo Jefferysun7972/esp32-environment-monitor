@@ -57,7 +57,7 @@ Page({
   onLoad() {
     this._requestSeq = 0;
     const app = getApp();
-    const sysInfo = wx.getSystemInfoSync();
+    const sysInfo = wx.getWindowInfo();
     const sensors = this._getSensors();
     const isFahrenheit = app.getTempUnit();
     const isDark = app.getTheme() === 'dark';
@@ -308,7 +308,7 @@ Page({
         const W = this.data.canvasWidth;
         const H = this.data.canvasHeight;
 
-        const dpr = wx.getSystemInfoSync().pixelRatio;
+        const dpr = wx.getWindowInfo().pixelRatio;
 
         canvas.width = W * dpr;
         canvas.height = H * dpr;
