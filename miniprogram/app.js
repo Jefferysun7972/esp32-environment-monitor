@@ -39,25 +39,26 @@ App({
     this._loadCache();
     this._loadSettings();
     
-    // 如果主题为 auto，检测系统深色模式
-    if (this.globalData.theme === 'auto') {
-      const sysInfo = wx.getSystemInfoSync();
-      this.globalData.theme = sysInfo.theme === 'dark' ? 'dark' : 'light';
-    }
-    
     // ✨ 立即设置全局导航栏和背景色，避免页面闪烁
+    // getTheme() 会自动处理 auto 模式，解析系统主题
     this._applyGlobalTheme();
     
     // 监听前台/后台切换，确保从后台恢复时立即设置样式
+    // 使用 _appLaunched 避免首次启动时与 onLaunch 重复调用
     if (wx.onAppShow) {
-      wx.onAppShow(() => {
+      this._appLaunched = false;
+      this._appShowHandler = wx.onAppShow(() => {
+        if (!this._appLaunched) {
+          this._appLaunched = true;
+          return;
+        }
         this._applyGlobalTheme();
       });
     }
     
     // 监听系统主题变化
     if (wx.onThemeChange) {
-      wx.onThemeChange((res) => {
+      this._themeChangeHandler = wx.onThemeChange((res) => {
         if (this.globalData.theme === 'auto') {
           const newTheme = res.theme === 'dark' ? 'dark' : 'light';
           this.globalData.theme = newTheme;
@@ -86,11 +87,11 @@ App({
     // 延迟启动定时器（给页面时间先渲染）
     setTimeout(() => {
       this.fetchData(); // 首次数据获取
-      setInterval(() => this.fetchData(), REFRESH_INTERVAL); // 定时刷新
+      this._refreshTimer = setInterval(() => this.fetchData(), REFRESH_INTERVAL); // 定时刷新
       
       // 异步发现传感器（后台）
-      this.discoverSensors((newSensors) => {
-        if (newSensors && newSensors.length > 0) {
+      this.discoverSensors((sensors) => {
+        if (sensors && sensors.length > 0) {
           console.log('[App] 发现到新传感器，更新列表');
           this.fetchData();
         }
@@ -145,23 +146,21 @@ App({
     } catch (e) {}
   },
 
-  _applyGlobalTheme() {
-    const isDark = this.globalData.theme === 'dark';
+  _applyTheme(theme, duration = 200) {
+    const isDark = theme === 'dark';
     const accent = this.globalData.accentColor;
-    
-    // ✨ 立即设置导航栏颜色（无动画，避免闪烁）
+
     if (wx.setNavigationBarColor) {
       wx.setNavigationBarColor({
         frontColor: isDark ? '#ffffff' : '#000000',
         backgroundColor: isDark ? '#1a1a2e' : '#ffffff',
         animation: {
-          duration: 0,
-          timingFunc: 'linear'
+          duration: duration,
+          timingFunc: duration === 0 ? 'linear' : 'easeIn'
         }
       });
     }
-    
-    // 设置 tabBar 样式
+
     if (wx.setTabBarStyle) {
       wx.setTabBarStyle({
         color: isDark ? '#777' : '#999',
@@ -170,8 +169,7 @@ App({
         borderStyle: isDark ? 'white' : 'black'
       });
     }
-    
-    // 设置全局背景色
+
     if (wx.setBackgroundColor) {
       wx.setBackgroundColor({
         backgroundColor: isDark ? '#1a1a2e' : '#f5f5f5',
@@ -179,8 +177,7 @@ App({
         backgroundColorBottom: isDark ? '#1a1a2e' : '#f5f5f5'
       });
     }
-    
-    // 设置 page 元素样式
+
     if (wx.setPageStyle) {
       wx.setPageStyle({
         style: {
@@ -190,40 +187,25 @@ App({
     }
   },
 
-  _applyTheme(theme) {
-    const isDark = theme === 'dark';
-    const accent = this.globalData.accentColor;
-    
-    // 导航栏保持中性色，不跟随强调色，避免突兀
-    wx.setNavigationBarColor({
-      frontColor: isDark ? '#ffffff' : '#000000',
-      backgroundColor: isDark ? '#1a1a2e' : '#ffffff',
-      animation: {
-        duration: 200,
-        timingFunc: 'easeIn'
-      }
-    });
-    
-    wx.setTabBarStyle({
-      color: isDark ? '#777' : '#999',
-      selectedColor: accent,
-      backgroundColor: isDark ? '#1a1a2e' : '#fff',
-      borderStyle: isDark ? 'white' : 'black'
-    });
-    
+  _applyGlobalTheme() {
+    this._applyTheme(this.getTheme(), 0);
+  },
+
+  applyPageBackground(isDark) {
+    const bgColor = isDark ? '#1a1a2e' : '#f5f5f5';
+
     if (wx.setBackgroundColor) {
       wx.setBackgroundColor({
-        backgroundColor: isDark ? '#1a1a2e' : '#f5f5f5',
-        backgroundColorTop: isDark ? '#1a1a2e' : '#f5f5f5',
-        backgroundColorBottom: isDark ? '#1a1a2e' : '#f5f5f5'
+        backgroundColor: bgColor,
+        backgroundColorTop: bgColor,
+        backgroundColorBottom: bgColor
       });
     }
-    
-    // 设置 page 元素样式，确保背景色正确
+
     if (wx.setPageStyle) {
       wx.setPageStyle({
         style: {
-          background: isDark ? '#1a1a2e' : '#f5f5f5'
+          background: bgColor
         }
       });
     }
@@ -329,7 +311,7 @@ schema.measurements(bucket: "sensor_data")`;
           this.globalData.sensors = sensors;
           this.globalData.sensorData = Object.fromEntries(sensors.map(s => [s.id, {}]));
           console.log('[discover] ✅ 发现', sensors.length, '个传感器:', measurements.join(', '));
-          callback();
+          callback(sensors);
           return;
         } else {
           console.warn('[discover] ⚠️ 查询成功但未找到任何 measurement');
@@ -341,7 +323,7 @@ schema.measurements(bucket: "sensor_data")`;
       
       console.log('[discover] 使用兜底传感器列表');
       this._fallbackSensors();
-      callback();
+      callback(this.globalData.sensors);
     });
   },
 

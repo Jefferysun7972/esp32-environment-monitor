@@ -418,7 +418,6 @@ Page({
     const wasPinch = this._pinchTriggered;
     this._pinchStartDist = 0;
     this._pinchTriggered = false;
-    this._touchPending = null;
     if (this._touchTimer) {
       clearTimeout(this._touchTimer);
       this._touchTimer = null;
@@ -841,37 +840,9 @@ Page({
   },
 
   _applyPageBackground(isDark) {
-    const bgColor = isDark ? '#1a1a2e' : '#f5f5f5';
-    
-    // 注意：导航栏颜色由 app.js 统一管理，避免重复设置导致闪烁
-    
-    // 设置页面根元素背景色
-    if (wx.setBackgroundColor) {
-      wx.setBackgroundColor({
-        backgroundColor: bgColor,
-        backgroundColorTop: bgColor,
-        backgroundColorBottom: bgColor
-      });
-    }
-    
-    // 设置 page 元素样式，确保背景色正确
-    if (wx.setPageStyle) {
-      wx.setPageStyle({
-        style: {
-          background: bgColor
-        }
-      });
-      
-      // 额外：延迟再次设置，确保样式生效
-      setTimeout(() => {
-        if (wx.setPageStyle) {
-          wx.setPageStyle({
-            style: {
-              background: bgColor
-            }
-          });
-        }
-      }, 100);
+    const app = getApp();
+    if (app.applyPageBackground) {
+      app.applyPageBackground(isDark);
     }
   },
 

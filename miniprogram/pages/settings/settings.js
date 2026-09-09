@@ -35,6 +35,25 @@ Page({
     });
   },
 
+  onLoad() {
+    const app = getApp();
+    const rawTheme = app.getRawTheme();
+    const effectiveTheme = app.getTheme();
+    const isDark = effectiveTheme === 'dark';
+
+    this.setData({
+      theme: effectiveTheme,
+      rawTheme: rawTheme,
+      pageTheme: effectiveTheme,
+      isFahrenheit: app.getTempUnit(),
+      accentColor: app.getAccentColor(),
+      highContrast: app.isHighContrast()
+    });
+
+    this._updateHeaderLabels();
+    this._applyPageBackground(isDark);
+  },
+
   onShow() {
     const app = getApp();
     const rawTheme = app.getRawTheme();
@@ -139,26 +158,9 @@ Page({
   },
 
   _applyPageBackground(isDark) {
-    const bgColor = isDark ? '#1a1a2e' : '#f5f5f5';
-    
-    // 注意：导航栏颜色由 app.js 统一管理，避免重复设置导致闪烁
-    
-    // 设置页面根元素背景色
-    if (wx.setBackgroundColor) {
-      wx.setBackgroundColor({
-        backgroundColor: bgColor,
-        backgroundColorTop: bgColor,
-        backgroundColorBottom: bgColor
-      });
-    }
-    
-    // 设置 page 元素样式，确保背景色正确
-    if (wx.setPageStyle) {
-      wx.setPageStyle({
-        style: {
-          background: bgColor
-        }
-      });
+    const app = getApp();
+    if (app.applyPageBackground) {
+      app.applyPageBackground(isDark);
     }
   },
 
