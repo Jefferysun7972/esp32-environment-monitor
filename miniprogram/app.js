@@ -1,6 +1,6 @@
-const INFLUXDB_URL = 'https://us-east-1-1.aws.cloud2.influxdata.com';
-const INFLUXDB_ORG = 'Fellowes';
-const INFLUXDB_TOKEN = 'doR-H4EoxcxidC5AYN0NjzYQB7kJ5cusQvXe16b7j1W_tO4ouL35MlFayhPfTlnxR0djAgCwCFfgOVZSCXyzog==';
+const INFLUXDB_URL = 'https://YOUR_INFLUXDB_URL';
+const INFLUXDB_ORG = 'YOUR_ORG_NAME';
+const INFLUXDB_TOKEN = 'YOUR_INFLUXDB_TOKEN';
 const REFRESH_INTERVAL = 20000;
 
 const { SENSOR_COLORS, ENV_FALLBACK_SENSORS } = require('./config/sensors');
