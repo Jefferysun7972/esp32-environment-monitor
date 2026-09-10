@@ -15,8 +15,8 @@
 
 static const char *TAG = "wifi_web";
 
-#define WIFI_SSID      "HUAWEI-5FEC"
-#define WIFI_PASS      "97395269"
+#define WIFI_SSID      "YOUR_WIFI_SSID"
+#define WIFI_PASS      "YOUR_WIFI_PASSWORD"
 #define WIFI_MAX_RETRY 10
 
 static int s_retry_num = 0;
