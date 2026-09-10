@@ -99,7 +99,7 @@ Page({
     const activeSet = new Set(filters.filter(f => f.active).map(f => f.id));
     const cards = sensors.map(s => {
       const data = sensorData[s.id] || {};
-      const fields = Object.keys(data);
+      const fields = Object.keys(data).filter(f => FIELD_LABELS[f]);
       const allMetrics = fields.map(f => {
         const rawVal = data[f];
         const val = rawVal !== undefined && rawVal !== null && !isNaN(rawVal) ? rawVal : null;

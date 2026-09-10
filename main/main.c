@@ -38,6 +38,10 @@
 #include "mqtt_cloud.h"
 #include "influxdb_writer.h"
 
+#ifdef SENSOR_USE_UART
+#include "uart_sensor.h"
+#endif
+
 #include <math.h>
 #include "am2020dy.h"
 #include "sensirion_i2c_hal.h"
@@ -446,6 +450,189 @@ static bool read_and_display_dual_data(void)
     return is_alert;
 }
 
+#ifdef SENSOR_USE_UART
+static bool g_uart_ready = false;
+
+static bool read_and_display_all_sensors(void)
+{
+    am2020dy_data_t a_data;
+    uart_sensor_data_t u_data;
+    uint16_t s_pm1, s_pm25, s_pm4, s_pm10;
+    int16_t s_hum, s_temp, s_voc, s_nox;
+    uint16_t s_hcho = 0, s_co2 = 0;
+
+    bool a_ok = g_am2020dy_ready && (am2020dy_read_measurement(s_am2020dy_dev_handle, &a_data) == ESP_OK);
+    bool u_ok = uart_sensor_read(&u_data);
+    bool s_ok = false;
+
+    if (g_sen_ready) {
+        if (g_sen_type == 66) {
+            s_ok = (sen66_read_measured_values_as_integers(
+                        &s_pm1, &s_pm25, &s_pm4, &s_pm10,
+                        &s_hum, &s_temp, &s_voc, &s_nox, &s_co2) == NO_ERROR);
+        } else {
+            s_ok = (sen68_read_measured_values_as_integers(
+                        &s_pm1, &s_pm25, &s_pm4, &s_pm10,
+                        &s_hum, &s_temp, &s_voc, &s_nox, &s_hcho) == NO_ERROR);
+        }
+    }
+
+    if (!a_ok && g_am2020dy_ready) ESP_LOGW(TAG, "Failed to read AM2020DY data");
+    if (!u_ok) ESP_LOGW(TAG, "Failed to read UART sensor data");
+    if (!s_ok && g_sen_ready) ESP_LOGW(TAG, "Failed to read SEN%u data", g_sen_type);
+
+    float u_temp = (float)u_data.temperature;
+    float u_hum  = (float)u_data.humidity;
+    float u_pm1  = (float)u_data.pms_in_pm1_0;
+    float u_pm25 = (float)u_data.pms_in_pm2_5;
+    float u_pm10 = (float)u_data.pms_in_pm10;
+    float u_co2  = (float)u_data.co2_count;
+    float u_tvoc = (float)u_data.tvoc_count;
+    float u_pres = (float)u_data.pressure_count;
+    uint16_t u_aq = u_data.aq_state;
+
+    float s_temp_f = s_temp / 200.0f;
+    float s_hum_f = s_hum / 100.0f;
+    float s_voc_f = s_voc / 10.0f;
+    float s_nox_f = s_nox / 10.0f;
+    float s_hcho_f = s_hcho / 10.0f;
+    float voc_clamped = (s_voc_f > 500.0f) ? 500.0f : s_voc_f;
+    float s_tvoc_f = (logf(501.0f - voc_clamped) - 6.24f) * (-313.6f);
+
+    float a_temp = a_ok ? a_data.temperature : u_temp;
+    float a_hum  = a_ok ? a_data.humidity  : u_hum;
+
+    float pm25_for_alert = a_ok ? (float)a_data.pm2_5 : (u_ok ? u_pm25 : 0);
+    bool is_alert = alert_check_environmental(pm25_for_alert, 0);
+
+    if (is_alert != s_alert_active) {
+        if (is_alert) {
+            ESP_LOGW(TAG, "ENVIRONMENTAL ALERT ACTIVATED! PM2.5: %.1f", pm25_for_alert);
+        } else {
+            ESP_LOGI(TAG, "Environmental conditions returned to normal.");
+        }
+        s_alert_active = is_alert;
+    }
+
+    if (a_ok) {
+        ESP_LOGI(TAG, "[AM2020DY] T:%.1fC H:%.1f%% PM1:%u PM2.5:%u PM10:%u TVOC:%u NO2:%u HCHO:%u",
+                 a_data.temperature, a_data.humidity,
+                 a_data.pm1_0, a_data.pm2_5, a_data.pm10,
+                 a_data.tvoc, a_data.no2, a_data.hcho);
+    }
+    if (u_ok) {
+        ESP_LOGI(TAG, "[UART    ] T:%.1fC H:%.1f%% PM1:%.0f PM2.5:%.0f PM10:%.0f TVOC:%.0f CO2:%.0f Pres:%.0f AQ:%u",
+                 u_temp, u_hum, u_pm1, u_pm25, u_pm10, u_tvoc, u_co2, u_pres, u_aq);
+    }
+    if (s_ok) {
+        if (g_sen_type == 66) {
+            ESP_LOGI(TAG, "[SEN66   ] T:%.1fC H:%.1f%% PM1:%u PM2.5:%u PM10:%u TVOC:%.1f NOx:%.1f CO2:%u",
+                     s_temp_f, s_hum_f, s_pm1, s_pm25, s_pm10, s_tvoc_f, s_nox_f, s_co2);
+        } else {
+            ESP_LOGI(TAG, "[SEN68   ] T:%.1fC H:%.1f%% PM1:%u PM2.5:%u PM10:%u TVOC:%.1f NOx:%.1f HCHO:%.1f",
+                     s_temp_f, s_hum_f, s_pm1, s_pm25, s_pm10, s_tvoc_f, s_nox_f, s_hcho_f);
+        }
+    }
+
+#if USE_TFT_LCD
+    if (g_am2020dy_ready) {
+        ui_au_compare_data_t d = {
+            .a_temp     = a_temp,
+            .a_humidity = a_hum,
+            .a_pm1      = (float)a_data.pm1_0,
+            .a_pm25     = (float)a_data.pm2_5,
+            .a_pm10     = (float)a_data.pm10,
+            .a_tvoc     = (float)a_data.tvoc,
+            .a_hcho     = (float)a_data.hcho,
+            .u_temp     = u_temp,
+            .u_humidity = u_hum,
+            .u_pm1      = u_pm1,
+            .u_pm25     = u_pm25,
+            .u_pm10     = u_pm10,
+            .u_tvoc     = u_tvoc,
+            .u_co2      = u_co2,
+            .u_pres     = u_pres,
+            .u_aq       = u_aq,
+            .color_temp  = alert_get_color(fmaxf(a_temp, u_temp), TEMP_NORMAL_MIN, TEMP_NORMAL_MAX, TEMP_DANGER_MAX, true),
+            .color_humid = alert_get_color(fmaxf(a_hum, u_hum), HUMID_NORMAL_MIN, HUMID_NORMAL_MAX, HUMID_DANGER_MAX, true),
+            .color_pm1   = alert_get_color(fmaxf((float)a_data.pm1_0, u_pm1), 0, PM1_NORMAL_MAX, PM1_WARNING_MAX, false),
+            .color_pm25  = alert_get_color(fmaxf((float)a_data.pm2_5, u_pm25), 0, PM25_NORMAL_MAX, PM25_WARNING_MAX, false),
+            .color_pm10  = alert_get_color(fmaxf((float)a_data.pm10, u_pm10), 0, PM10_NORMAL_MAX, PM10_WARNING_MAX, false),
+            .global_level = alert_get_global_level(a_temp, a_hum, 0, (float)a_data.pm2_5, 0, (float)a_data.tvoc, 0),
+        };
+        ui_draw_au_compare_table(&d);
+    } else {
+        ui_sensor_data_t d = {
+            .temp_celsius = u_temp,
+            .humidity_pct = u_hum,
+            .nox_idx_f    = 0,
+            .voc_idx_f    = u_tvoc,
+            .pm2_5_ugm3   = u_pm25,
+            .pm1_ugm3     = u_pm1,
+            .pm10_ugm3    = u_pm10,
+            .pressure_hpa = u_pres,
+            .co2          = (uint16_t)u_co2,
+            .hcho_ppb     = 0,
+            .aq_state     = u_aq,
+            .color_temp  = alert_get_color(u_temp, TEMP_NORMAL_MIN, TEMP_NORMAL_MAX, TEMP_DANGER_MAX, true),
+            .color_humid = alert_get_color(u_hum,  HUMID_NORMAL_MIN, HUMID_NORMAL_MAX, HUMID_DANGER_MAX, true),
+            .color_nox   = TFT_BLUE,
+            .color_voc   = alert_get_color(u_tvoc, 0, VOC_NORMAL_MAX, VOC_WARNING_MAX, false),
+            .color_pm25  = alert_get_color(u_pm25, 0, PM25_NORMAL_MAX, PM25_WARNING_MAX, false),
+            .color_pm1   = alert_get_color(u_pm1,  0, PM1_NORMAL_MAX,  PM1_WARNING_MAX, false),
+            .color_pm10  = alert_get_color(u_pm10, 0, PM10_NORMAL_MAX, PM10_WARNING_MAX, false),
+            .color_co2   = TFT_BLUE,
+            .color_hcho  = TFT_BLUE,
+            .color_pres  = TFT_BLUE,
+            .color_aq    = TFT_BLUE,
+            .global_level = alert_get_global_level(u_temp, u_hum, 0, u_pm25, 0, u_tvoc, 0),
+        };
+        ui_draw_sensor_screen(&d);
+    }
+#endif
+
+    {
+        mqtt_sensor_data_t wd = {
+            .am2020dy_temp = a_temp,
+            .am2020dy_humi = a_hum,
+            .am2020dy_pm1  = a_ok ? (float)a_data.pm1_0  : 0,
+            .am2020dy_pm25 = a_ok ? (float)a_data.pm2_5  : 0,
+            .am2020dy_pm10 = a_ok ? (float)a_data.pm10   : 0,
+            .am2020dy_tvoc = a_ok ? (float)a_data.tvoc   : 0,
+            .am2020dy_no2  = a_ok ? (float)a_data.no2    : 0,
+            .am2020dy_hcho = a_ok ? (float)a_data.hcho   : 0,
+            .sen_ready = s_ok,
+            .sen_temp = s_temp_f,
+            .sen_humi = s_hum_f,
+            .sen_pm1  = (float)s_pm1,
+            .sen_pm25 = (float)s_pm25,
+            .sen_pm10 = (float)s_pm10,
+            .sen_tvoc = s_tvoc_f,
+            .sen_nox  = s_nox_f,
+            .sen_co2  = (float)s_co2,
+            .sen_hcho = s_hcho_f,
+            .uart_ready = true,
+            .uart_temp = u_temp,
+            .uart_humi = u_hum,
+            .uart_pm1  = u_pm1,
+            .uart_pm25 = u_pm25,
+            .uart_pm10 = u_pm10,
+            .uart_tvoc = u_tvoc,
+            .uart_co2  = u_co2,
+            .uart_pres = u_pres,
+            .uart_aq   = u_aq,
+            .alert_level = alert_get_global_level(a_temp, a_hum, 0, (float)a_data.pm2_5, 0, (float)a_data.tvoc, 0),
+        };
+        snprintf(wd.sen_name, sizeof(wd.sen_name), "%s",
+                 g_sen_type == 66 ? "SEN66" : "SEN68");
+        mqtt_cloud_publish(&wd);
+        influxdb_writer_send(&wd);
+    }
+
+    return is_alert;
+}
+#endif
+
 void app_main(void)
 {
     configure_led();
@@ -466,26 +653,45 @@ void app_main(void)
     }
     ESP_LOGI(TAG, "I2C bus initialized successfully");
 
-    /* Skip i2c_master_probe scan: AM2020DY uses frame-based protocol
-     * that does not respond to bare address ACK probes.
-     * Command-based detection will be done in init_am2020dy_sensor(). */
+    /* Skip i2c_master_probe scan: AM2020DY uses frame-based protocol */
     ESP_LOGI(TAG, "Skipping i2c_master_probe scan (AM2020DY uses frame protocol)");
 
     /* Initialize AM2020DY sensor */
     init_am2020dy_sensor();
 
     if (!g_am2020dy_ready) {
-        ESP_LOGE(TAG, "❌ AM2020DY not found - halting. Check wiring and pull-up resistors.");
-        while (1) {
-            vTaskDelay(pdMS_TO_TICKS(1000));
-        }
+        ESP_LOGW(TAG, "AM2020DY not found - continuing with other sensors");
     }
 
     /* Initialize SEN sensor */
     init_sen_sensor();
 
-    if (g_sen_ready) {
+#ifdef SENSOR_USE_UART
+    /* Initialize UART sensor */
+    ESP_LOGI(TAG, "Initializing UART sensor...");
+    if (uart_sensor_init()) {
+        g_uart_ready = true;
+        ESP_LOGI(TAG, "UART sensor initialized successfully");
+    } else {
+        ESP_LOGW(TAG, "UART sensor init failed, continuing without UART");
+    }
+#endif
+
+    /* Set display mode and sensor name */
+    if (g_uart_ready) {
+        if (g_am2020dy_ready) {
+            g_display_mode = DISPLAY_MODE_DUAL;
+            g_sensor_name = "AM2020DY vs UART";
+            g_sensor_type = SENSOR_DUAL_I2C;
+        } else {
+            g_display_mode = DISPLAY_MODE_SINGLE;
+            g_sensor_name = "UART-MOD";
+            g_sensor_type = SENSOR_UART;
+        }
+    } else if (g_sen_ready) {
         g_display_mode = DISPLAY_MODE_DUAL;
+        g_sensor_name = (g_sen_type == 66) ? "AM2020DY vs SEN66" : "AM2020DY vs SEN68";
+        g_sensor_type = SENSOR_DUAL_I2C;
     } else {
         g_display_mode = DISPLAY_MODE_SINGLE;
         g_sensor_name = "AM2020DY";
@@ -500,17 +706,27 @@ void app_main(void)
              g_sensor_name, SENSOR_READ_PERIOD_MS);
 
     wifi_web_init();
-    ESP_LOGI(TAG, "WiFi connected: %s", wifi_web_get_ip_str());
+    const char *ip = wifi_web_get_ip_str();
+    ESP_LOGI(TAG, "WiFi IP: %s", ip);
 
-    mqtt_cloud_init();
-    ESP_LOGI(TAG, "MQTT cloud client started");
+    if (ip[0] != '\0') {
+        mqtt_cloud_init();
+        ESP_LOGI(TAG, "MQTT cloud client started");
 
-    influxdb_writer_init();
-    ESP_LOGI(TAG, "InfluxDB writer started");
+        influxdb_writer_init();
+        ESP_LOGI(TAG, "InfluxDB writer started");
+    } else {
+        ESP_LOGW(TAG, "No WiFi - skipping MQTT and InfluxDB init");
+    }
 
     while (1) {
         bool alert_active;
 
+#ifdef SENSOR_USE_UART
+        if (g_uart_ready) {
+            alert_active = read_and_display_all_sensors();
+        } else
+#endif
         if (g_sen_ready) {
             alert_active = read_and_display_dual_data();
         } else {

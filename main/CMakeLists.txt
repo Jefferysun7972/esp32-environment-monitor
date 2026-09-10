@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "blink_example_main.c"
+    SRCS "main.c"
         "sensor_detect.c"
         "alert_manager.c"
         "ui_display.c"

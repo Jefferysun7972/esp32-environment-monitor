@@ -6,31 +6,23 @@ page {
   background: #f5f5f5;
   min-height: 100vh;
   min-height: 100dvh;
+  padding-top: 272rpx;
   padding-bottom: 100rpx;
   box-sizing: border-box;
 }
 
 /* Header */
 .header {
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   padding: 120rpx 40rpx 40rpx;
-  margin: 0 -24rpx 24rpx;
-  overflow: hidden;
-}
-
-.header-bg {
-  position: absolute;
-  top: -80rpx;
-  left: -40rpx;
-  right: -40rpx;
-  bottom: 0;
-  background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
-  border-radius: 0 0 60rpx 60rpx;
+  z-index: 100;
 }
 
 .header-content {
-  position: relative;
-  z-index: 1;
+
 }
 
 .header-title {
@@ -124,6 +116,7 @@ page {
   align-items: center;
   justify-content: center;
   box-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.06);
+  overflow: hidden;
 }
 
 .chart-canvas {
@@ -444,10 +437,6 @@ page .container.theme-dark,
 /* 强制覆盖 page 元素背景 */
 page[style*="background: rgb(26, 26, 46)"] {
   background: #1a1a2e !important;
-}
-
-.theme-dark .header-bg {
-  background: linear-gradient(135deg, #0d47a1 0%, #0a0a1a 100%) !important;
 }
 
 .theme-dark .header-title,

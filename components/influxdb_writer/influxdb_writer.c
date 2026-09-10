@@ -8,17 +8,21 @@
 #include "esp_log.h"
 #include "esp_http_client.h"
 #include "esp_crt_bundle.h"
+#include "lwip/netdb.h"
+#include "lwip/inet.h"
+#include <sys/socket.h>
 
 static const char *TAG = "influxdb";
 
-#define INFLUXDB_URL    "https://your-region.cloud2.influxdata.com"
-#define INFLUXDB_ORG    "your_org"
+#define INFLUXDB_URL    "https://YOUR_INFLUXDB_URL"
+#define INFLUXDB_HOST   "YOUR_INFLUXDB_URL"
+#define INFLUXDB_ORG    "YOUR_ORG_NAME"
 #define INFLUXDB_BUCKET "sensor_data"
-#define INFLUXDB_TOKEN  "your_api_token"
+#define INFLUXDB_TOKEN  "YOUR_INFLUXDB_TOKEN"
 
 #define INFLUXDB_TASK_STACK  8192
 #define INFLUXDB_TASK_PRIO   5
-#define INFLUXDB_QUEUE_LEN   3
+#define INFLUXDB_QUEUE_LEN   16
 
 static char s_write_url[256];
 static QueueHandle_t s_queue = NULL;
@@ -61,14 +65,43 @@ static void influxdb_task(void *pvParameters)
             }
         }
 
+        if (data.uart_ready) {
+            len = snprintf(line, sizeof(line),
+                "uart,device=esp32 temp=%.1f,humi=%.1f,pm1=%.1f,pm25=%.1f,pm10=%.1f,tvoc=%.1f,co2=%.1f,pres=%.1f,aq=%u\n",
+                data.uart_temp, data.uart_humi,
+                data.uart_pm1, data.uart_pm25, data.uart_pm10,
+                data.uart_tvoc, data.uart_co2, data.uart_pres, data.uart_aq);
+            if (len > 0 && len < (int)sizeof(line)) {
+                memcpy(body + total_len, line, len);
+                total_len += len;
+            }
+        }
+
         if (total_len == 0) {
             continue;
+        }
+
+        ESP_LOGI(TAG, "Sending to URL: %s", s_write_url);
+
+        {
+            struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM };
+            struct addrinfo *res = NULL;
+            int rc = getaddrinfo(INFLUXDB_HOST, NULL, &hints, &res);
+            if (rc == 0 && res != NULL) {
+                char ip_str[16];
+                struct sockaddr_in *sa = (struct sockaddr_in *)res->ai_addr;
+                snprintf(ip_str, sizeof(ip_str), "%s", inet_ntoa(sa->sin_addr));
+                ESP_LOGI(TAG, "DNS resolved: %s -> %s", INFLUXDB_HOST, ip_str);
+                freeaddrinfo(res);
+            } else {
+                ESP_LOGW(TAG, "DNS pre-check failed: getaddrinfo returned %d", rc);
+            }
         }
 
         esp_http_client_config_t config = {
             .url = s_write_url,
             .method = HTTP_METHOD_POST,
-            .timeout_ms = 10000,
+            .timeout_ms = 15000,
             .crt_bundle_attach = esp_crt_bundle_attach,
         };
 

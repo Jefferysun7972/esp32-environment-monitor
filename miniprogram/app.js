@@ -1,6 +1,6 @@
-const INFLUXDB_URL = 'https://us-east-1-1.aws.cloud2.influxdata.com';
-const INFLUXDB_ORG = 'Fellowes';
-const INFLUXDB_TOKEN = 'doR-H4EoxcxidC5AYN0NjzYQB7kJ5cusQvXe16b7j1W_tO4ouL35MlFayhPfTlnxR0djAgCwCFfgOVZSCXyzog==';
+const INFLUXDB_URL = 'https://YOUR_INFLUXDB_URL';
+const INFLUXDB_ORG = 'YOUR_ORG_NAME';
+const INFLUXDB_TOKEN = 'YOUR_INFLUXDB_TOKEN';
 const REFRESH_INTERVAL = 20000;
 
 const { SENSOR_COLORS, ENV_FALLBACK_SENSORS } = require('./config/sensors');
@@ -113,6 +113,47 @@ App({
         this.globalData.dataCached = true;
       }
     } catch (e) {}
+    
+    // 归一化缓存数据：press → pressure，丢弃 aq（修复旧缓存中的脏数据）
+    this._normalizeSensorData(this.globalData.sensorData);
+
+    // 去重：按 measurement 字段去重（修复旧缓存中可能存在的重复数据）
+    const seen = new Set();
+    this.globalData.sensors = (this.globalData.sensors || []).filter(s => {
+      if (seen.has(s.measurement)) {
+        console.log('[App] 去除重复传感器:', s.measurement);
+        return false;
+      }
+      seen.add(s.measurement);
+      return true;
+    });
+
+    // 仅在完全没有传感器时使用兜底列表
+    if (this.globalData.sensors.length === 0) {
+      this.globalData.sensors = ENV_FALLBACK_SENSORS;
+      ENV_FALLBACK_SENSORS.forEach(s => {
+        if (!this.globalData.sensorData[s.id]) {
+          this.globalData.sensorData[s.id] = {};
+        }
+      });
+      console.log('[App] 无缓存，使用兜底传感器列表:', ENV_FALLBACK_SENSORS.map(s => s.id).join(', '));
+    }
+  },
+
+  _normalizeSensorData(sensorData) {
+    if (!sensorData) return;
+    for (const sid in sensorData) {
+      const entry = sensorData[sid];
+      if (entry.pres !== undefined) {
+        entry.pressure = entry.pres;
+        delete entry.pres;
+      }
+      if (entry.press !== undefined) {
+        entry.pressure = entry.press;
+        delete entry.press;
+      }
+      delete entry.aq;
+    }
   },
 
   _saveCache() {
@@ -294,7 +335,7 @@ App({
 schema.measurements(bucket: "sensor_data")`;
 
     console.log('[discover] 开始自动发现传感器...');
-    this._queryInfluxDB(query, 10000, (err, res) => {
+    this._queryInfluxDB(query, 20000, (err, res) => {
       if (!err && res && res.statusCode === 200) {
         console.log('[discover] 查询成功，响应数据长度:', res.data ? res.data.length : 0);
         const measurements = this._parseMeasurementsCSV(res.data);
@@ -323,6 +364,35 @@ schema.measurements(bucket: "sensor_data")`;
       } else {
         const msg = err ? (err.errMsg || '网络错误') : ('HTTP ' + (res ? res.statusCode : '?'));
         console.error('[discover] ❌ 自动发现失败:', msg);
+        
+        // 重试一次
+        console.log('[discover] 2秒后重试...');
+        setTimeout(() => {
+          this._queryInfluxDB(query, 20000, (err2, res2) => {
+            if (!err2 && res2 && res2.statusCode === 200) {
+              const measurements = this._parseMeasurementsCSV(res2.data);
+              if (measurements.length > 0) {
+                const sensors = measurements.map((m, i) => {
+                  const colors = SENSOR_COLORS[i % SENSOR_COLORS.length];
+                  return {
+                    id: m, measurement: m, label: m,
+                    shortLabel: m.substring(0, 2).toUpperCase(),
+                    description: 'Sensor Module', ...colors
+                  };
+                });
+                this.globalData.sensors = sensors;
+                this.globalData.sensorData = Object.fromEntries(sensors.map(s => [s.id, {}]));
+                console.log('[discover] ✅ 重试成功，发现', sensors.length, '个传感器:', measurements.join(', '));
+                callback(sensors);
+                return;
+              }
+            }
+            console.log('[discover] 重试也失败，使用兜底传感器列表');
+            this._fallbackSensors();
+            callback(this.globalData.sensors);
+          });
+        }, 2000);
+        return;
       }
       
       console.log('[discover] 使用兜底传感器列表');
@@ -366,51 +436,86 @@ schema.measurements(bucket: "sensor_data")`;
   },
 
   fetchData() {
-    const sensors = this._sensors();
-    const measurements = sensors.map(s => s.measurement);
-    let completed = 0;
-    let successCount = 0;
-
-    measurements.forEach((measurement) => {
-      const query = `from(bucket: "sensor_data")
+    // 一次查询所有 measurement，从数据中自动识别传感器
+    const query = `from(bucket: "sensor_data")
   |> range(start: -5m)
-  |> filter(fn: (r) => r._measurement == "${measurement}")
   |> aggregateWindow(every: 5m, fn: last, createEmpty: false)`;
 
-      this._queryInfluxDB(query, 15000, (err, res) => {
-        if (!err && res && res.statusCode === 200) {
-          const parsed = this.parseCSV(res.data);
-          if (parsed.length > 0) {
-            successCount++;
-            const sensor = sensors.find(s => s.measurement === measurement);
-            const key = sensor ? sensor.id : measurement;
-            const entry = this.globalData.sensorData[key] || {};
-            parsed.forEach(row => {
-              entry[row.field] = row.value;
-            });
-            this.globalData.sensorData[key] = entry;
-          } else {
-            console.warn('[fetchData]', measurement, '200 OK 但无数据行');
-            this.globalData._lastError = measurement + ': 无数据（ESP32 可能未上报）';
-          }
-        } else {
-          const msg = err ? (err.errMsg || '网络错误') : ('HTTP ' + (res ? res.statusCode : '?'));
-          console.warn('[fetchData]', measurement, msg);
-          this.globalData._lastError = measurement + ': ' + msg;
-        }
-        completed++;
-        if (completed === measurements.length) {
-          this.globalData.connected = successCount > 0;
-          if (successCount > 0) {
-            this.globalData.lastUpdate = new Date().toLocaleTimeString();
-            this._saveCache();
-          }
+    this._queryInfluxDB(query, 15000, (err, res) => {
+      if (!err && res && res.statusCode === 200) {
+        const parsed = this.parseCSVWithMeasurement(res.data);
+        
+        if (parsed.length === 0) {
+          console.warn('[fetchData] 查询成功但无数据');
+          this.globalData._lastError = '无数据（ESP32 可能未上报）';
+          this.globalData.connected = false;
           this.notifyPages();
-          if (!this.globalData.connected) {
-            console.warn('[实时数据] 全部请求失败，最后错误:', this.globalData._lastError);
-          }
+          return;
         }
-      });
+
+        // 从数据中自动发现传感器，并用真实列表替换（而非追加）
+        const measurements = [...new Set(parsed.map(r => r.measurement))];
+        this._rebuildSensorsFromMeasurements(measurements);
+
+        // 存储传感器数据（统一字段名：press/pres → pressure，丢弃 aq）
+        parsed.forEach(row => {
+          if (row.field === 'aq') return;
+          const entry = this.globalData.sensorData[row.measurement] || {};
+          const field = (row.field === 'press' || row.field === 'pres') ? 'pressure' : row.field;
+          entry[field] = row.value;
+          this.globalData.sensorData[row.measurement] = entry;
+        });
+
+        this.globalData.connected = true;
+        this.globalData.lastUpdate = new Date().toLocaleTimeString();
+        this._saveCache();
+        this.notifyPages();
+      } else {
+        const msg = err ? (err.errMsg || '网络错误') : ('HTTP ' + (res ? res.statusCode : '?'));
+        console.warn('[fetchData] 请求失败:', msg);
+        this.globalData._lastError = msg;
+        this.globalData.connected = false;
+        this.notifyPages();
+      }
+    });
+  },
+
+  _rebuildSensorsFromMeasurements(measurements) {
+    // 用真实数据重建传感器列表（替换而非追加）
+    const oldMap = {};
+    this.globalData.sensors.forEach(s => {
+      oldMap[s.measurement] = s;
+    });
+
+    const newSensors = measurements.map((m, idx) => {
+      const existing = oldMap[m];
+      if (existing) {
+        // 保留已有传感器的元数据，但统一 id 和 measurement
+        return { ...existing, id: m, measurement: m };
+      }
+      // 新传感器：自动分配颜色
+      const colors = SENSOR_COLORS[idx % SENSOR_COLORS.length];
+      return {
+        id: m,
+        measurement: m,
+        label: m,
+        shortLabel: m.substring(0, 2).toUpperCase(),
+        description: 'Sensor Module',
+        ...colors
+      };
+    });
+
+    const oldIds = this.globalData.sensors.map(s => s.measurement).sort().join(',');
+    const newIds = measurements.sort().join(',');
+    if (oldIds !== newIds) {
+      console.log('[fetchData] 🔄 传感器列表更新:', oldIds || '(空)', '→', newIds);
+    }
+
+    this.globalData.sensors = newSensors;
+    measurements.forEach(m => {
+      if (!this.globalData.sensorData[m]) {
+        this.globalData.sensorData[m] = {};
+      }
     });
   },
 
@@ -441,6 +546,29 @@ schema.measurements(bucket: "sensor_data")`;
     return result;
   },
 
+  parseCSVWithMeasurement(csv) {
+    const parsed = this._getCSVHeaders(csv);
+    if (!parsed) return [];
+    const { lines, headers } = parsed;
+    const measurementIdx = headers.indexOf('_measurement');
+    const fieldIdx = headers.indexOf('_field');
+    const valueIdx = headers.indexOf('_value');
+    if (measurementIdx < 0 || fieldIdx < 0 || valueIdx < 0) return [];
+
+    const result = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',');
+      const val = parseFloat(cols[valueIdx]);
+      if (isNaN(val)) continue;
+      result.push({
+        measurement: cols[measurementIdx],
+        field: cols[fieldIdx],
+        value: val
+      });
+    }
+    return result;
+  },
+
   notifyPages() {
     const pages = getCurrentPages();
     for (let i = pages.length - 1; i >= 0; i--) {
@@ -460,15 +588,19 @@ schema.measurements(bucket: "sensor_data")`;
     console.log('[fetchHistory] globalData.sensors:', JSON.stringify(this.globalData.sensors.map(s => s.id)));
     
     const measurementFilter = sensors.map(s => `r._measurement == "${s.measurement}"`).join(' or ');
+    const fieldFilter = field === 'pressure'
+      ? `(r._field == "pressure" or r._field == "pres" or r._field == "press")`
+      : `r._field == "${field}"`;
     const query = `from(bucket: "sensor_data")
   |> range(start: -${range})
   |> filter(fn: (r) => ${measurementFilter})
-  |> filter(fn: (r) => r._field == "${field}")
+  |> filter(fn: (r) => ${fieldFilter})
   |> aggregateWindow(every: ${this.getWindow(range)}, fn: mean, createEmpty: false)`;
 
     console.log('[fetchHistory] 查询参数:');
     console.log('  - 时间范围:', range);
     console.log('  - 字段:', field);
+    console.log('  - 字段过滤器:', fieldFilter);
     console.log('  - 传感器过滤器:', measurementFilter);
     console.log('  - 完整查询:\n', query);
     

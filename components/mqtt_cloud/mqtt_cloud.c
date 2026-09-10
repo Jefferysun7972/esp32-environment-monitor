@@ -10,9 +10,9 @@
 
 static const char *TAG = "mqtt_cloud";
 
-#define MQTT_BROKER_URI  "mqtts://your-broker.emqxsl.cn:8883"
-#define MQTT_USERNAME    "your_username"
-#define MQTT_PASSWORD    "your_password"
+#define MQTT_BROKER_URI  "mqtts://YOUR_MQTT_BROKER:8883"
+#define MQTT_USERNAME    "YOUR_MQTT_USERNAME"
+#define MQTT_PASSWORD    "YOUR_MQTT_PASSWORD"
 
 static esp_mqtt_client_handle_t s_client = NULL;
 static bool s_connected = false;
@@ -101,5 +101,15 @@ void mqtt_cloud_publish(const mqtt_sensor_data_t *data)
         char topic[32];
         snprintf(topic, sizeof(topic), "sensor/%s", data->sen_name);
         esp_mqtt_client_publish(s_client, topic, buf, 0, 1, 0);
+    }
+
+    if (data->uart_ready) {
+        len = snprintf(buf, sizeof(buf),
+            "{\"temp\":%.1f,\"humi\":%.1f,\"pm1\":%.1f,\"pm25\":%.1f,\"pm10\":%.1f,"
+            "\"tvoc\":%.1f,\"co2\":%.1f,\"pres\":%.1f,\"aq\":%u}",
+            data->uart_temp, data->uart_humi,
+            data->uart_pm1, data->uart_pm25, data->uart_pm10,
+            data->uart_tvoc, data->uart_co2, data->uart_pres, data->uart_aq);
+        esp_mqtt_client_publish(s_client, "sensor/uart", buf, 0, 1, 0);
     }
 }
