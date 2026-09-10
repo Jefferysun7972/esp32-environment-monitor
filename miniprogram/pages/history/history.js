@@ -46,7 +46,9 @@ Page({
     exporting: false,
     pageTheme: 'light',
     highContrast: false,
-    accentColor: '#1a73e8'
+    accentColor: '#1a73e8',
+    scrollTop: 0,
+    headerHeight: 240
   },
 
   _getSensors() {
@@ -107,12 +109,12 @@ Page({
       return { ...m, supported };
     });
 
-    // 自动发现 METRICS 中未定义但 ESP32 实际在报的新字段
+    // 自动发现 METRICS 中未定义但 ESP32 实际在报的新字段（仅限 FIELD_LABELS 中已定义的）
     const knownKeys = new Set(METRICS.map(m => m.key));
     const discovered = new Set();
     for (const sid in sensorData) {
       for (const key in sensorData[sid]) {
-        if (!knownKeys.has(key) && sensorData[sid][key] !== undefined && !isNaN(sensorData[sid][key])) {
+        if (!knownKeys.has(key) && FIELD_LABELS[key] && sensorData[sid][key] !== undefined && !isNaN(sensorData[sid][key])) {
           discovered.add(key);
         }
       }
@@ -160,6 +162,10 @@ Page({
     if (this.data.chartData) {
       setTimeout(() => this.drawChart(), 50);
     }
+  },
+
+  onPageScroll(e) {
+    this.setData({ scrollTop: e.scrollTop });
   },
 
   onPullDownRefresh() {
@@ -436,18 +442,18 @@ Page({
     const meta = this._chartMeta;
 
     // Check if tap on legend
-    if (meta && touch) {
+    if (meta && touch && meta.legX !== undefined && meta.labelWidths) {
       const sensors = this._getSensors();
-      const legX = meta.pad.l + meta.pw - 195;
+      let cumX = 0;
       for (let i = 0; i < sensors.length; i++) {
-        const offsetX = i * 120;
-        if (touch.x >= legX + offsetX && touch.x <= legX + offsetX + 105 &&
+        if (touch.x >= meta.legX + cumX && touch.x <= meta.legX + cumX + meta.labelWidths[i] &&
             touch.y >= 6 && touch.y <= 26) {
           const showSensor = [...this.data.showSensor];
           showSensor[i] = !showSensor[i];
           this.setData({ showSensor }, () => this.drawChart());
           return;
         }
+        cumX += meta.labelWidths[i];
       }
     }
 
@@ -636,20 +642,29 @@ Page({
     });
 
     // Legend with counts (tap to toggle)
-    const legX = pad.l + pw - 195;
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
+
+    const labels = sensors.map((s, i) => {
+      const shortLabel = s.label.length > 5 ? s.label.substring(0, 5) : s.label;
+      return shortLabel + '(' + series[i].length + ')';
+    });
+    const labelWidths = labels.map(l => ctx.measureText(l).width + 24);
+    const totalWidth = labelWidths.reduce((a, b) => a + b, 0);
+    const legX = pad.l + pw - totalWidth;
+
+    let cumX = 0;
     sensors.forEach((s, i) => {
-      const offsetX = i * 120;
       ctx.fillStyle = this.data.showSensor[i] ? s.color : theme.legendDisabled;
-      ctx.fillRect(legX + offsetX, 8, 14, 10);
+      ctx.fillRect(legX + cumX, 8, 14, 10);
       ctx.fillStyle = this.data.showSensor[i] ? theme.legendText : theme.legendDisabled;
-      ctx.fillText(s.label + '(' + series[i].length + ')', legX + offsetX + 18, 8);
+      ctx.fillText(labels[i], legX + cumX + 18, 8);
+      cumX += labelWidths[i];
     });
 
     // Save metadata for touch handler
-    this._chartMeta = { series, ref, N, pad, sx, sy, pw, ph, metric };
+    this._chartMeta = { series, ref, N, pad, sx, sy, pw, ph, metric, legX, labelWidths };
 
     // Draw crosshair + tooltip
     if (touchPoint) {

@@ -81,12 +81,20 @@ const ENV_FALLBACK_SENSORS = [
     color: '#ff6d00', colorLight: '#ffab40', iconBg: '#fff3e0', iconColor: '#ff6d00'
   },
   {
-    id: 'sen68',
+    id: 'SEN68',
     measurement: 'SEN68',
     label: 'SEN68',
     shortLabel: 'S6',
     description: 'Sensor Module',
     color: '#1a73e8', colorLight: '#64b5f6', iconBg: '#e3f2fd', iconColor: '#1a73e8'
+  },
+  {
+    id: 'uart',
+    measurement: 'uart',
+    label: 'UART',
+    shortLabel: 'UA',
+    description: 'UART Sensor',
+    color: '#6a1b9a', colorLight: '#ce93d8', iconBg: '#f3e5f5', iconColor: '#6a1b9a'
   }
 ];
 

@@ -1,12 +1,13 @@
+<view class="header">
+  <view class="header-bg" style="background: {{pageTheme === 'dark' ? 'linear-gradient(135deg, #0d47a1 0%, #0a0a1a 100%)' : 'linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%)'}};"></view>
+  <view class="header-content">
+    <text class="header-title">设置</text>
+    <text class="header-subtitle">{{themeLabel}} · {{tempUnitLabel}}</text>
+  </view>
+</view>
+
 <view class="container {{pageTheme === 'dark' ? 'theme-dark' : ''}} {{highContrast ? 'high-contrast' : ''}}"
       style="background: {{pageTheme === 'dark' ? '#1a1a2e' : '#f5f5f5'}};">
-  <view class="header">
-    <view class="header-bg" style="background: {{pageTheme === 'dark' ? 'linear-gradient(135deg, #0d47a1 0%, #0a0a1a 100%)' : 'linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%)'}};"></view>
-    <view class="header-content">
-      <text class="header-title">设置</text>
-      <text class="header-subtitle">{{themeLabel}} · {{tempUnitLabel}}</text>
-    </view>
-  </view>
 
   <view class="section">
     <view class="section-title">外观</view>

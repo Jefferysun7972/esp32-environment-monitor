@@ -1,13 +1,12 @@
+<view class="header" style="background: {{pageTheme === 'dark' ? '#0d47a1' : '#1a73e8'}};">
+  <view class="header-content">
+    <view class="header-title">历史曲线</view>
+    <view class="header-subtitle">{{selectedMetricLabel}} · {{selectedRangeLabel}} {{chartData ? '(' + chartData.length + ' 个数据点)' : ''}}</view>
+  </view>
+</view>
+
 <view class="container {{pageTheme === 'dark' ? 'theme-dark' : ''}} {{highContrast ? 'high-contrast' : ''}}" 
       style="background: {{pageTheme === 'dark' ? '#1a1a2e' : '#f5f5f5'}};">
-  
-  <view class="header">
-    <view class="header-bg" style="background: {{pageTheme === 'dark' ? 'linear-gradient(135deg, #0d47a1 0%, #0a0a1a 100%)' : 'linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%)'}};"></view>
-    <view class="header-content">
-      <text class="header-title">历史曲线</text>
-      <text class="header-subtitle">{{selectedMetricLabel}} · {{selectedRangeLabel}} {{chartData ? '(' + chartData.length + ' 个数据点)' : ''}}</text>
-    </view>
-  </view>
 
   <view class="controls">
     <view class="section-title">时间范围</view>
@@ -55,26 +54,6 @@
     </view>
   </view>
 
-  <view class="chart-container">
-    <canvas
-      type="2d"
-      id="historyCanvas"
-      class="chart-canvas"
-      style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
-      bindtouchstart="onCanvasTouch"
-      bindtouchmove="onCanvasTouch"
-      bindtouchend="onCanvasTouchEnd"
-    ></canvas>
-    <text class="pinch-hint" wx:if="{{chartData && chartData.length > 0}}">双指缩放切换时间范围</text>
-    <view wx:if="{{loading}}" class="overlay">
-      <text class="loading">加载中...</text>
-    </view>
-    <view wx:elif="{{!chartData || chartData.length === 0}}" class="overlay">
-      <text class="empty-text">暂无数据</text>
-      <text class="empty-hint">请确保 ESP32 正在运行</text>
-    </view>
-  </view>
-
   <view class="stats-bar" wx:if="{{stats}}">
     <view class="section-title">统计摘要</view>
     <view class="stats-grid">
@@ -95,6 +74,26 @@
           </view>
         </view>
       </view>
+    </view>
+  </view>
+
+  <view class="chart-container">
+    <canvas
+      type="2d"
+      id="historyCanvas"
+      class="chart-canvas"
+      style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"
+      bindtouchstart="onCanvasTouch"
+      bindtouchmove="onCanvasTouch"
+      bindtouchend="onCanvasTouchEnd"
+    ></canvas>
+    <text class="pinch-hint" wx:if="{{chartData && chartData.length > 0}}">双指缩放切换时间范围</text>
+    <view wx:if="{{loading}}" class="overlay">
+      <text class="loading">加载中...</text>
+    </view>
+    <view wx:elif="{{!chartData || chartData.length === 0}}" class="overlay">
+      <text class="empty-text">暂无数据</text>
+      <text class="empty-hint">请确保 ESP32 正在运行</text>
     </view>
   </view>
 
