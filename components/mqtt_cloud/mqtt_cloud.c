@@ -13,40 +13,67 @@ static const char *TAG = "mqtt_cloud";
 /* ===========================================
  * 🔐 凭证配置 - 支持本地开发模式
  * =========================================== 
- * 优先级：
- * 1. credentials.local.h (本地开发，真实凭证)
- * 2. 默认占位符 (公开代码，需替换)
+ * 
+ * 配置优先级：
+ * 1. credentials.local.h (本地开发，真实凭证) - 推荐
+ * 2. 默认占位符 (公开代码，需手动替换)
  */
+
+// 尝试检测并包含本地配置文件
+#define USE_LOCAL_CREDENTIALS_MQTT 0  // 默认不使用
 
 #ifdef __has_include
     #if __has_include("credentials.local.h")
-        #include "credentials.local.h"
-        #define USE_LOCAL_CREDENTIALS 1
-    #else
-        #define USE_LOCAL_CREDENTIALS 0
+        #ifndef CREDENTIALS_LOCAL_H  // 避免重复包含
+            #include "credentials.local.h"
+        #endif
+        #undef USE_LOCAL_CREDENTIALS_MQTT
+        #define USE_LOCAL_CREDENTIALS_MQTT 1
     #endif
-#else
-    #define USE_LOCAL_CREDENTIALS 0
 #endif
 
-#if USE_LOCAL_CREDENTIALS
-    /* 使用本地凭证配置 */
-    #define MQTT_BROKER_URI  LOCAL_MQTT_BROKER_URI
-    #define MQTT_USERNAME    LOCAL_MQTT_USERNAME
-    #define MQTT_PASSWORD    LOCAL_MQTT_PASSWORD
-    
-    #ifdef LOCAL_CREDENTIALS_DEBUG
-        #if LOCAL_CREDENTIALS_DEBUG
-            #pragma message ("🔧 MQTT: 使用 credentials.local.h 中的配置")
-        #endif
+// 如果 __has_include 不可用或失败，尝试直接包含（允许失败）
+#if !USE_LOCAL_CREDENTIALS_MQTT
+    #ifndef CREDENTIALS_LOCAL_H
+        #include "credentials.local.h"
     #endif
+    // 检查是否成功定义了必要的宏
+    #ifdef LOCAL_MQTT_BROKER_URI
+        #undef USE_LOCAL_CREDENTIALS_MQTT
+        #define USE_LOCAL_CREDENTIALS_MQTT 1
+    #endif
+#endif
+
+// 最终确定使用哪个配置源
+#if USE_LOCAL_CREDENTIALS_MQTT
+    /* ✅ 使用本地凭证配置（从 credentials.local.h） */
+    #ifdef LOCAL_MQTT_BROKER_URI
+        #define MQTT_BROKER_URI  LOCAL_MQTT_BROKER_URI
+    #else
+        #define MQTT_BROKER_URI  "mqtts://YOUR_MQTT_BROKER:8883"
+    #endif
+    
+    #ifdef LOCAL_MQTT_USERNAME
+        #define MQTT_USERNAME    LOCAL_MQTT_USERNAME
+    #else
+        #define MQTT_USERNAME    "YOUR_MQTT_USERNAME"
+    #endif
+    
+    #ifdef LOCAL_MQTT_PASSWORD
+        #define MQTT_PASSWORD    LOCAL_MQTT_PASSWORD
+    #else
+        #define MQTT_PASSWORD    "YOUR_MQTT_PASSWORD"
+    #endif
+    
+    #pragma message ("✅ MQTT: 使用 credentials.local.h 中的配置")
 #else
-    /* 使用默认占位符（需手动替换为真实值） */
+    /* ⚠️ 使用默认占位符（未找到 credentials.local.h 或其中未定义必要宏） */
     #define MQTT_BROKER_URI  "mqtts://YOUR_MQTT_BROKER:8883"
     #define MQTT_USERNAME    "YOUR_MQTT_USERNAME"
     #define MQTT_PASSWORD    "YOUR_MQTT_PASSWORD"
     
-    #warning "⚠️ MQTT: 使用默认占位符，请配置 credentials.local.h 或直接修改下方值"
+    #warning "⚠️ MQTT: 未检测到 credentials.local.h，使用默认占位符"
+    #warning "   解决方案: 运行 bash scripts/setup-credentials.sh 或手动创建 credentials.local.h"
 #endif
 
 static esp_mqtt_client_handle_t s_client = NULL;

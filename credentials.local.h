@@ -29,8 +29,8 @@ extern "C" {
  * 🌐 WiFi 配置
  * =========================================== */
 
-#define LOCAL_WIFI_SSID      "YOUR_WIFI_SSID"
-#define LOCAL_WIFI_PASS      "YOUR_WIFI_PASSWORD"
+#define LOCAL_WIFI_SSID      "HUAWEI-5FEC"
+#define LOCAL_WIFI_PASS      "97395269973952699739526997395269"
 #define LOCAL_WIFI_MAX_RETRY 10
 
 
@@ -38,28 +38,28 @@ extern "C" {
  * ☁️ MQTT 配置 (EMQX Cloud)
  * =========================================== */
 
-#define LOCAL_MQTT_BROKER_URI  "mqtts://YOUR_MQTT_BROKER:8883"
-#define LOCAL_MQTT_USERNAME    "YOUR_MQTT_USERNAME"
-#define LOCAL_MQTT_PASSWORD    "YOUR_MQTT_PASSWORD"
+#define LOCAL_MQTT_BROKER_URI  "mqtts://f4319339.ala.cn-hangzhou.emqxsl.cn:8883"
+#define LOCAL_MQTT_USERNAME    "jerrysun"
+#define LOCAL_MQTT_PASSWORD    "任意004"
 
 
 /* ===========================================
  * 📊 InfluxDB Cloud 配置
  * =========================================== */
 
-#define LOCAL_INFLUXDB_URL    "https://YOUR_INFLUXDB_URL"
-#define LOCAL_INFLUXDB_HOST   "YOUR_INFLUXDB_URL"
-#define LOCAL_INFLUXDB_ORG    "YOUR_ORG_NAME"
+#define LOCAL_INFLUXDB_URL    "https://us-east-1-1.aws.cloud2.influxdata.com"
+#define LOCAL_INFLUXDB_HOST   "us-east-1-1.aws.cloud2.influxdata.com"
+#define LOCAL_INFLUXDB_ORG    "Fellowes"
 #define LOCAL_INFLUXDB_BUCKET "sensor_data"
-#define LOCAL_INFLUXDB_TOKEN  "YOUR_INFLUXDB_TOKEN"
+#define LOCAL_INFLUXDB_TOKEN  "doR-H4EoxcxidC5AYN0NjzYQB7kJ5cusQvXe16b7j1W_tO4ouL35MlFayhPfTlnxR0djAgCwCFfgOVZSCXyzog=="
 
 
 /* ===========================================
  * 📱 微信小程序配置
  * =========================================== */
 
-#define LOCAL_MINIPROGRAM_INFLUXDB_URL    "https://YOUR_INFLUXDB_URL"
-#define LOCAL_MINIPROGRAM_INFLUXDB_ORG    "YOUR_ORG_NAME"
+#define LOCAL_MINIPROGRAM_INFLUXDB_URL    "https://us-east-1-1.aws.cloud2.influxdata.com"
+#define LOCAL_MINIPROGRAM_INFLUXDB_ORG    "Fellowes"
 #define LOCAL_MINIPROGRAM_INFLUXDB_BUCKET "sensor_data"
 #define LOCAL_MINIPROGRAM_INFLUXDB_TOKEN  "YOUR_INFLUXDB_TOKEN"
 

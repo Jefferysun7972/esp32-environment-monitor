@@ -18,40 +18,80 @@ static const char *TAG = "wifi_web";
 /* ===========================================
  * 🔐 凭证配置 - 支持本地开发模式
  * =========================================== 
- * 优先级：
- * 1. credentials.local.h (本地开发，真实凭证)
- * 2. 默认占位符 (公开代码，需替换)
+ * 
+ * 配置优先级：
+ * 1. credentials.local.h (本地开发，真实凭证) - 推荐
+ * 2. 默认占位符 (公开代码，需手动替换)
+ * 
+ * 使用方法：
+ * - 复制 credentials.local.h.example 为 credentials.local.h
+ * - 填写真实凭证
+ * - 重新编译即可自动使用
+ * 
+ * 检测方式：
+ * - 方式1: __has_include (C++17/GCC5+/Clang3.6+)
+ * - 方式2: 直接 include (回退方案，如果文件不存在会报错但可忽略)
  */
+
+// 尝试检测并包含本地配置文件
+#define USE_LOCAL_CREDENTIALS 0  // 默认不使用
 
 #ifdef __has_include
     #if __has_include("credentials.local.h")
         #include "credentials.local.h"
+        #undef USE_LOCAL_CREDENTIALS
         #define USE_LOCAL_CREDENTIALS 1
-    #else
-        #define USE_LOCAL_CREDENTIALS 0
     #endif
-#else
-    #define USE_LOCAL_CREDENTIALS 0
 #endif
 
+// 如果 __has_include 不可用或失败，尝试直接包含（允许失败）
+#if !USE_LOCAL_CREDENTIALS
+    #include "credentials.local.h"
+    // 如果文件存在，上面的 include 会成功定义 LOCAL_WIFI_SSID 等宏
+    // 我们通过检查是否定义了 LOCAL_WIFI_SSID 来判断
+    #ifdef LOCAL_WIFI_SSID
+        #undef USE_LOCAL_CREDENTIALS
+        #define USE_LOCAL_CREDENTIALS 1
+    #endif
+#endif
+
+// 最终确定使用哪个配置源
 #if USE_LOCAL_CREDENTIALS
-    /* 使用本地凭证配置 */
-    #define WIFI_SSID      LOCAL_WIFI_SSID
-    #define WIFI_PASS      LOCAL_WIFI_PASS
-    #define WIFI_MAX_RETRY LOCAL_WIFI_MAX_RETRY
+    /* ✅ 使用本地凭证配置（从 credentials.local.h） */
+    #ifdef LOCAL_WIFI_SSID
+        #define WIFI_SSID      LOCAL_WIFI_SSID
+    #else
+        #define WIFI_SSID      "YOUR_WIFI_SSID"
+    #endif
+    
+    #ifdef LOCAL_WIFI_PASS
+        #define WIFI_PASS      LOCAL_WIFI_PASS
+    #else
+        #define WIFI_PASS      "YOUR_WIFI_PASSWORD"
+    #endif
+    
+    #ifdef LOCAL_WIFI_MAX_RETRY
+        #define WIFI_MAX_RETRY LOCAL_WIFI_MAX_RETRY
+    #else
+        #define WIFI_MAX_RETRY 10
+    #endif
     
     #ifdef LOCAL_CREDENTIALS_DEBUG
         #if LOCAL_CREDENTIALS_DEBUG
-            #pragma message ("🔧 WiFi: 使用 credentials.local.h 中的配置")
+            #pragma message ("✅ WiFi: 使用 credentials.local.h 中的配置")
+            #pragma message ("   SSID: " LOCAL_WIFI_SSID)
         #endif
+    #else
+        #pragma message ("✅ WiFi: 使用 credentials.local.h 中的配置")
     #endif
 #else
-    /* 使用默认占位符（需手动替换为真实值） */
+    /* ⚠️ 使用默认占位符（未找到 credentials.local.h 或其中未定义必要宏） */
     #define WIFI_SSID      "YOUR_WIFI_SSID"
     #define WIFI_PASS      "YOUR_WIFI_PASSWORD"
     #define WIFI_MAX_RETRY 10
     
-    #warning "⚠️ WiFi: 使用默认占位符，请配置 credentials.local.h 或直接修改下方值"
+    #warning "⚠️ WiFi: 未检测到 credentials.local.h，使用默认占位符"
+    #warning "   解决方案: 运行 bash scripts/setup-credentials.sh 或手动创建 credentials.local.h"
 #endif
 
 static int s_retry_num = 0;

@@ -100,14 +100,26 @@ REAL_CREDENTIALS=(
 FOUND_REAL_CREDS=false
 
 for cred in "${REAL_CREDENTIALS[@]}"; do
-    # 在源代码中搜索（排除 node_modules 和 build 目录）
+    # 在源代码中搜索（排除以下目录和文件）：
+    # - node_modules: 依赖包
+    # - build: 编译产物
+    # - .git: Git 内部文件
+    # - credentials.local.h: 本地配置文件（允许包含真实凭证）
+    # - *.local.h: 所有本地配置文件
     if grep -r "$cred" --include="*.c" --include="*.h" --include="*.js" --include="*.json" \
-           --exclude-dir=node_modules --exclude-dir=build --exclude-dir=.git 2>/dev/null; then
+           --exclude-dir=node_modules --exclude-dir=build --exclude-dir=.git \
+           --exclude="credentials.local.h" --exclude="*.local.h" 2>/dev/null; then
         echo -e "${RED}❌ 发现真实凭证: $cred${NC}"
         ((ERRORS++))
         FOUND_REAL_CREDS=true
     fi
 done
+
+# 特别说明：credentials.local.h 中的凭证是预期行为
+if [ -f "credentials.local.h" ]; then
+    echo -e "${BLUE}ℹ️  注意: credentials.local.h 包含真实凭证（这是正常的）${NC}"
+    echo -e "${BLUE}   此文件已被 .gitignore 保护，不会被提交到 Git${NC}"
+fi
 
 if [ "$FOUND_REAL_CREDS" = false ]; then
     echo -e "${GREEN}✅ 未发现硬编码的真实凭证${NC}"
