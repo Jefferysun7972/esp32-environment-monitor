@@ -15,9 +15,44 @@
 
 static const char *TAG = "wifi_web";
 
-#define WIFI_SSID      "YOUR_WIFI_SSID"
-#define WIFI_PASS      "YOUR_WIFI_PASSWORD"
-#define WIFI_MAX_RETRY 10
+/* ===========================================
+ * 🔐 凭证配置 - 支持本地开发模式
+ * =========================================== 
+ * 优先级：
+ * 1. credentials.local.h (本地开发，真实凭证)
+ * 2. 默认占位符 (公开代码，需替换)
+ */
+
+#ifdef __has_include
+    #if __has_include("credentials.local.h")
+        #include "credentials.local.h"
+        #define USE_LOCAL_CREDENTIALS 1
+    #else
+        #define USE_LOCAL_CREDENTIALS 0
+    #endif
+#else
+    #define USE_LOCAL_CREDENTIALS 0
+#endif
+
+#if USE_LOCAL_CREDENTIALS
+    /* 使用本地凭证配置 */
+    #define WIFI_SSID      LOCAL_WIFI_SSID
+    #define WIFI_PASS      LOCAL_WIFI_PASS
+    #define WIFI_MAX_RETRY LOCAL_WIFI_MAX_RETRY
+    
+    #ifdef LOCAL_CREDENTIALS_DEBUG
+        #if LOCAL_CREDENTIALS_DEBUG
+            #pragma message ("🔧 WiFi: 使用 credentials.local.h 中的配置")
+        #endif
+    #endif
+#else
+    /* 使用默认占位符（需手动替换为真实值） */
+    #define WIFI_SSID      "YOUR_WIFI_SSID"
+    #define WIFI_PASS      "YOUR_WIFI_PASSWORD"
+    #define WIFI_MAX_RETRY 10
+    
+    #warning "⚠️ WiFi: 使用默认占位符，请配置 credentials.local.h 或直接修改下方值"
+#endif
 
 static int s_retry_num = 0;
 static char s_ip_str[16] = {0};

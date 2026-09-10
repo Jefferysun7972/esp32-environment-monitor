@@ -14,11 +14,48 @@
 
 static const char *TAG = "influxdb";
 
-#define INFLUXDB_URL    "https://YOUR_INFLUXDB_URL"
-#define INFLUXDB_HOST   "YOUR_INFLUXDB_URL"
-#define INFLUXDB_ORG    "YOUR_ORG_NAME"
-#define INFLUXDB_BUCKET "sensor_data"
-#define INFLUXDB_TOKEN  "YOUR_INFLUXDB_TOKEN"
+/* ===========================================
+ * 🔐 凭证配置 - 支持本地开发模式
+ * =========================================== 
+ * 优先级：
+ * 1. credentials.local.h (本地开发，真实凭证)
+ * 2. 默认占位符 (公开代码，需替换)
+ */
+
+#ifdef __has_include
+    #if __has_include("credentials.local.h")
+        #include "credentials.local.h"
+        #define USE_LOCAL_CREDENTIALS 1
+    #else
+        #define USE_LOCAL_CREDENTIALS 0
+    #endif
+#else
+    #define USE_LOCAL_CREDENTIALS 0
+#endif
+
+#if USE_LOCAL_CREDENTIALS
+    /* 使用本地凭证配置 */
+    #define INFLUXDB_URL    LOCAL_INFLUXDB_URL
+    #define INFLUXDB_HOST   LOCAL_INFLUXDB_HOST
+    #define INFLUXDB_ORG    LOCAL_INFLUXDB_ORG
+    #define INFLUXDB_BUCKET LOCAL_INFLUXDB_BUCKET
+    #define INFLUXDB_TOKEN  LOCAL_INFLUXDB_TOKEN
+    
+    #ifdef LOCAL_CREDENTIALS_DEBUG
+        #if LOCAL_CREDENTIALS_DEBUG
+            #pragma message ("🔧 InfluxDB: 使用 credentials.local.h 中的配置")
+        #endif
+    #endif
+#else
+    /* 使用默认占位符（需手动替换为真实值） */
+    #define INFLUXDB_URL    "https://YOUR_INFLUXDB_URL"
+    #define INFLUXDB_HOST   "YOUR_INFLUXDB_URL"
+    #define INFLUXDB_ORG    "YOUR_ORG_NAME"
+    #define INFLUXDB_BUCKET "sensor_data"
+    #define INFLUXDB_TOKEN  "YOUR_INFLUXDB_TOKEN"
+    
+    #warning "⚠️ InfluxDB: 使用默认占位符，请配置 credentials.local.h 或直接修改下方值"
+#endif
 
 #define INFLUXDB_TASK_STACK  8192
 #define INFLUXDB_TASK_PRIO   5

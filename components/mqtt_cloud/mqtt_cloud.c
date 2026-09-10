@@ -10,9 +10,44 @@
 
 static const char *TAG = "mqtt_cloud";
 
-#define MQTT_BROKER_URI  "mqtts://YOUR_MQTT_BROKER:8883"
-#define MQTT_USERNAME    "YOUR_MQTT_USERNAME"
-#define MQTT_PASSWORD    "YOUR_MQTT_PASSWORD"
+/* ===========================================
+ * 🔐 凭证配置 - 支持本地开发模式
+ * =========================================== 
+ * 优先级：
+ * 1. credentials.local.h (本地开发，真实凭证)
+ * 2. 默认占位符 (公开代码，需替换)
+ */
+
+#ifdef __has_include
+    #if __has_include("credentials.local.h")
+        #include "credentials.local.h"
+        #define USE_LOCAL_CREDENTIALS 1
+    #else
+        #define USE_LOCAL_CREDENTIALS 0
+    #endif
+#else
+    #define USE_LOCAL_CREDENTIALS 0
+#endif
+
+#if USE_LOCAL_CREDENTIALS
+    /* 使用本地凭证配置 */
+    #define MQTT_BROKER_URI  LOCAL_MQTT_BROKER_URI
+    #define MQTT_USERNAME    LOCAL_MQTT_USERNAME
+    #define MQTT_PASSWORD    LOCAL_MQTT_PASSWORD
+    
+    #ifdef LOCAL_CREDENTIALS_DEBUG
+        #if LOCAL_CREDENTIALS_DEBUG
+            #pragma message ("🔧 MQTT: 使用 credentials.local.h 中的配置")
+        #endif
+    #endif
+#else
+    /* 使用默认占位符（需手动替换为真实值） */
+    #define MQTT_BROKER_URI  "mqtts://YOUR_MQTT_BROKER:8883"
+    #define MQTT_USERNAME    "YOUR_MQTT_USERNAME"
+    #define MQTT_PASSWORD    "YOUR_MQTT_PASSWORD"
+    
+    #warning "⚠️ MQTT: 使用默认占位符，请配置 credentials.local.h 或直接修改下方值"
+#endif
 
 static esp_mqtt_client_handle_t s_client = NULL;
 static bool s_connected = false;
