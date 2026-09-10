@@ -15,6 +15,7 @@
 static const char *TAG = "influxdb";
 
 #define INFLUXDB_URL    "https://YOUR_INFLUXDB_URL"
+#define INFLUXDB_HOST   "YOUR_INFLUXDB_URL"
 #define INFLUXDB_ORG    "YOUR_ORG_NAME"
 #define INFLUXDB_BUCKET "sensor_data"
 #define INFLUXDB_TOKEN  "YOUR_INFLUXDB_TOKEN"
@@ -85,12 +86,12 @@ static void influxdb_task(void *pvParameters)
         {
             struct addrinfo hints = { .ai_family = AF_INET, .ai_socktype = SOCK_STREAM };
             struct addrinfo *res = NULL;
-            int rc = getaddrinfo("us-east-1-1.aws.cloud2.influxdata.com", NULL, &hints, &res);
+            int rc = getaddrinfo(INFLUXDB_HOST, NULL, &hints, &res);
             if (rc == 0 && res != NULL) {
                 char ip_str[16];
                 struct sockaddr_in *sa = (struct sockaddr_in *)res->ai_addr;
                 snprintf(ip_str, sizeof(ip_str), "%s", inet_ntoa(sa->sin_addr));
-                ESP_LOGI(TAG, "DNS resolved: %s -> %s", "us-east-1-1.aws.cloud2.influxdata.com", ip_str);
+                ESP_LOGI(TAG, "DNS resolved: %s -> %s", INFLUXDB_HOST, ip_str);
                 freeaddrinfo(res);
             } else {
                 ESP_LOGW(TAG, "DNS pre-check failed: getaddrinfo returned %d", rc);

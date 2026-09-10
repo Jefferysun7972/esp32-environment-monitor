@@ -1,51 +1,202 @@
-# === ESP-IDF Build Artifacts ===
+# ===========================================
+# 🔐 ESP32 Environment Monitor - .gitignore
+# 防止敏感信息和临时文件被提交到 Git
+# ===========================================
+
+# -------------------------------------------
+# 🚨 敏感信息 & 凭证 (最高优先级)
+# -------------------------------------------
+
+# 环境变量文件 (包含真实密码)
+.env
+.env.local
+.env.*.local
+
+# 凭证配置文件
+credentials.json
+secrets.yaml
+config.local.* 
+*.credentials
+*.secret
+*.key
+*.pem
+*.p12
+*.pfx
+
+# WiFi/MQTT/InfluxDB 真实配置 (如果用户创建了本地副本)
+wifi_config.h
+mqtt_config.h
+influxdb_config.h
+*config_local.*
+
+# -------------------------------------------
+# 📦 ESP-IDF 编译产物
+# -------------------------------------------
+
+# 编译输出目录
 build/
 managed_components/
-dependencies.lock
 
-# === IDE and Editor Files ===
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-
-# === Compiled Object files ===
+# 编译缓存
 *.o
 *.obj
 *.elf
-*.map
-
-# === Libraries ===
-*.a
-*.lib
-
-# === Shared libraries (DLLs, SOs) ===
-*.dll
-*.so
-*.dylib
-
-# === Executables ===
-*.exe
-*.out
-*.app
-
-# === Binary firmware images ===
 *.bin
 *.hex
+*.map
+*.lst
+*.sym
+*.d
 
-# === Backup files ===
+# SDK 配置 (可能包含敏感信息)
+sdkconfig.old
+sdkconfig.h
+
+# Flash 镜像
+*.flash_image
+bootloader/bootloader.bin
+partitions.bin
+
+# -------------------------------------------
+# 📱 微信小程序 (miniprogram) 特定
+# -------------------------------------------
+
+# 小程序编译产物
+miniprogram_npm/
+node_modules/
+
+# 小程序本地缓存
+.miniprogram/
+.project.config.json.backup
+
+# 小程序真机调试日志
+*.log
+debug/
+
+# -------------------------------------------
+# 💻 IDE & 编辑器配置
+# -------------------------------------------
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+*.code-workspace
+
+# JetBrains (CLion, WebStorm, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Vim
+*.swp
+*.swo
+*~
+~*
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+sftp-config.json
+
+# -------------------------------------------
+# 🖥️ 操作系统文件
+# -------------------------------------------
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# -------------------------------------------
+# 📝 日志 & 临时文件
+# -------------------------------------------
+
+# 应用日志
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+*.temp
 *.bak
-*.orig
+*.backup
+*.swp
+*.swo
+*~
 
-# === SDK Configuration (optional - keep if you want to share config) ===
-# sdkconfig
-# sdkconfig.h
-# sdkconfig.old
+# 测试覆盖率
+coverage/
+*.lcov
+.nyc_output/
 
-# === Python ===
+# -------------------------------------------
+# 📊 项目特定
+# -------------------------------------------
+
+# 数据文件 (可能包含敏感数据)
+data/*.csv
+data/*.json
+!data/.gitkeep
+
+# 导出文件 (可能包含用户数据)
+exports/
+downloads/
+*.csv
+*.xlsx
+*.xls
+
+# 图片资源 (如果有大文件)
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+!**/images/**  # 保留项目必需的图片
+
+# -------------------------------------------
+# 🔧 工具链特定
+# -------------------------------------------
+
+# Python (如果有脚本工具)
 __pycache__/
 *.py[cod]
 *$py.class
@@ -53,12 +204,74 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
+pip-wheel-metadata/
 
-# === Logs ===
-*.log
-logs/
+# Node.js (如果有构建脚本)
+node_modules/
+dist/
+.next/
+.out/
+.npm
 
-# === Temporary files ===
-tmp/
-temp/
-*.tmp
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# -------------------------------------------
+# 📋 文档 & 备份
+# -------------------------------------------
+
+# 备份文件
+*.orig
+*.backup
+*.old
+*~
+
+# 自动生成的文档
+docs/_build/
+docs/auto/
+site/
+
+# -------------------------------------------
+# ⚠️ 特殊规则：允许但需注意的文件
+# -------------------------------------------
+
+# 注意：以下文件已包含占位符，可以安全提交
+# - components/wifi_web/wifi_web.c (YOUR_WIFI_*)
+# - components/mqtt_cloud/mqtt_cloud.c (YOUR_MQTT_*)
+# - components/influxdb_writer/influxdb_writer.c (YOUR_INFLUXDB_*)
+# - miniprogram/app.js (YOUR_INFLUXDB_*)
+
+# 如果用户创建了真实配置文件，确保被忽略：
+config_real.*
+*_real.*
+*_production.*
+*_staging.*
+
+# ===========================================
+# ✅ 安全检查建议
+# ===========================================
+
+# 提交前运行以下命令检查是否有遗漏：
+# 
+# 1. 检查是否跟踪了敏感文件：
+#    git ls-files | grep -E "(credential|secret|password|\.env|\.key)"
+#
+# 2. 检查暂存区是否包含敏感信息：
+#    git diff --cached | grep -E "(password|token|secret|api_key)"
+#
+# 3. 检查最近提交是否包含真实凭证：
+#    git log -p --all -S "HUAWEI-5FEC" -- "*.c" "*.js"
+#
+# 4. 使用 git-secrets 工具（推荐）：
+#    https://github.com/awslabs/git-secrets
+#
+# ===========================================
+# 📅 最后更新: 2026-09-10
+# 👤 维护者: ESP32 Environment Monitor Team
+# ===========================================
