@@ -9,12 +9,15 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "esp_netif.h"
+#include "lwip/dns.h"
+#include "lwip/netdb.h"
 
 static const char *TAG = "wifi_web";
 
-#define WIFI_SSID      "your_wifi_ssid"
-#define WIFI_PASS      "your_wifi_password"
-#define WIFI_MAX_RETRY 5
+#define WIFI_SSID      "HUAWEI-5FEC"
+#define WIFI_PASS      "97395269"
+#define WIFI_MAX_RETRY 10
 
 static int s_retry_num = 0;
 static char s_ip_str[16] = {0};
@@ -30,9 +33,10 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         if (s_retry_num < WIFI_MAX_RETRY) {
-            esp_wifi_connect();
             s_retry_num++;
-            ESP_LOGI(TAG, "WiFi retry %d/%d", s_retry_num, WIFI_MAX_RETRY);
+            ESP_LOGI(TAG, "WiFi retry %d/%d (waiting 3s...)", s_retry_num, WIFI_MAX_RETRY);
+            vTaskDelay(pdMS_TO_TICKS(3000));
+            esp_wifi_connect();
         } else {
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
@@ -42,6 +46,31 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
         ESP_LOGI(TAG, "WiFi connected! IP: %s", s_ip_str);
         s_retry_num = 0;
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        esp_wifi_set_ps(WIFI_PS_NONE);
+
+        {
+            esp_netif_t *netif = esp_netif_get_handle_from_ifkey("WIFI_STA_DEF");
+            if (netif) {
+                esp_netif_dns_info_t dns;
+                dns.ip.type = ESP_IPADDR_TYPE_V4;
+                dns.ip.u_addr.ip4.addr = esp_ip4addr_aton("8.8.8.8");
+                esp_netif_set_dns_info(netif, ESP_NETIF_DNS_MAIN, &dns);
+                dns.ip.u_addr.ip4.addr = esp_ip4addr_aton("114.114.114.114");
+                esp_netif_set_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns);
+                ESP_LOGI(TAG, "DNS set via esp_netif: 8.8.8.8 / 114.114.114.114");
+            } else {
+                ESP_LOGW(TAG, "esp_netif_get_handle_from_ifkey returned NULL");
+            }
+        }
+
+        {
+            ip_addr_t dns1, dns2;
+            ipaddr_aton("8.8.8.8", &dns1);
+            ipaddr_aton("114.114.114.114", &dns2);
+            dns_setserver(0, &dns1);
+            dns_setserver(1, &dns2);
+            ESP_LOGI(TAG, "DNS set via lwIP: 8.8.8.8 / 114.114.114.114");
+        }
     }
 }
 

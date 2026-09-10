@@ -2,7 +2,7 @@
  * UART Sensor Driver - Multi-parameter Environmental Sensor Module
  *
  * Communication: UART2, 9600 baud, 8N1
- * Pinout:        TX=GPIO17, RX=GPIO16
+ * Pinout:        TX=GPIO26, RX=GPIO27
  *
  * Data Frame (44 bytes total):
  *   [0x2D 0x23] [len_lo len_hi] [19×uint16_t LE] [cs_lo cs_hi]

@@ -29,6 +29,17 @@ typedef struct {
     float sen_co2;
     float sen_hcho;
 
+    bool uart_ready;
+    float uart_temp;
+    float uart_humi;
+    float uart_pm1;
+    float uart_pm25;
+    float uart_pm10;
+    float uart_tvoc;
+    float uart_co2;
+    float uart_pres;
+    uint16_t uart_aq;
+
     char sen_name[8];
     int alert_level;
 } mqtt_sensor_data_t;

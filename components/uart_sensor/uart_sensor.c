@@ -118,69 +118,54 @@ static void parse_frame(const uint8_t *buf, uart_sensor_data_t *data)
     data->ave_state_sum   = read_u16_le(p + 36);
 }
 
-static esp_err_t read_one_frame(uint8_t *buf, uart_sensor_data_t *out)
-{
-    /* Sync to frame header (0x2D 0x23) */
-    int state = 0;
-    uint8_t ch;
-
-    while (1) {
-        int n = uart_read_bytes(UART_SENSOR_PORT, &ch, 1, pdMS_TO_TICKS(50));
-        if (n <= 0) return ESP_ERR_TIMEOUT;
-
-        if (state == 0 && ch == UART_HEAD_LO) state = 1;
-        else if (state == 1) state = (ch == UART_HEAD_HI) ? 2 : (ch == UART_HEAD_LO ? 1 : 0);
-        if (state == 2) break;
-    }
-
-    buf[0] = UART_HEAD_LO;
-    buf[1] = UART_HEAD_HI;
-
-    /* Read length field (2 bytes LE) */
-    int n = uart_read_bytes(UART_SENSOR_PORT, buf + 2, 2, pdMS_TO_TICKS(100));
-    if (n < 2) return ESP_ERR_TIMEOUT;
-
-    uint16_t frame_len = read_u16_le(buf + 2);
-    if (frame_len < 8 || frame_len > UART_MAX_FRAME) return ESP_FAIL;
-
-    /* Read remaining: data + checksum */
-    int remain = frame_len - UART_HEADER_LEN - UART_LEN_LEN;
-    n = uart_read_bytes(UART_SENSOR_PORT, buf + 4, remain, pdMS_TO_TICKS(200));
-    if (n < remain) return ESP_ERR_TIMEOUT;
-
-    /* Validate checksum: sum of header + len + data */
-    uint16_t cs_recv = read_u16_le(buf + frame_len - UART_CS_LEN);
-    uint16_t cs_calc = calc_checksum(buf, frame_len - UART_CS_LEN);
-    if (cs_calc != cs_recv) return ESP_FAIL;
-
-    /* Parse fields from buf + 4 (after header + len) */
-    parse_frame(buf, out);
-
-    return ESP_OK;
-}
-
 bool uart_sensor_read(uart_sensor_data_t *data)
 {
     if (data == NULL) {
         return false;
     }
 
-    uint8_t buf[UART_MAX_FRAME];
+    /* Retry up to 3 times: sensor sends ~1 frame/sec, wait 1s each attempt */
+    size_t buf_len = 0;
+    for (int retry = 0; retry < 3; retry++) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        uart_get_buffered_data_len(UART_SENSOR_PORT, &buf_len);
+        if (buf_len >= 44) break;
+    }
+
+    if (buf_len == 0) {
+        ESP_LOGW(TAG, "No data in UART RX buffer after 3s wait (check power/baud/wiring)");
+        return false;
+    }
+    ESP_LOGI(TAG, "UART RX buffer has %u bytes available", (unsigned)buf_len);
+
+    uint8_t raw[256];
+    size_t to_read = (buf_len < sizeof(raw)) ? buf_len : sizeof(raw);
+    int n = uart_read_bytes(UART_SENSOR_PORT, raw, to_read, pdMS_TO_TICKS(100));
+
+    /* Try to find valid frames in the raw data */
     bool got_one = false;
     uart_sensor_data_t last;
 
-    /* Drain buffer: keep only the last valid frame */
-    while (1) {
-        uart_sensor_data_t tmp;
-        if (read_one_frame(buf, &tmp) == ESP_OK) {
-            last = tmp;
-            got_one = true;
-        } else {
-            break;
+    for (int offset = 0; offset <= n - 6; offset++) {
+        if (raw[offset] == UART_HEAD_LO && raw[offset + 1] == UART_HEAD_HI) {
+            uint16_t frame_len = (uint16_t)raw[offset + 2] | ((uint16_t)raw[offset + 3] << 8);
+            if (frame_len >= 8 && frame_len <= UART_MAX_FRAME && offset + (int)frame_len <= n) {
+                uint16_t cs_recv = (uint16_t)raw[offset + frame_len - 2] | ((uint16_t)raw[offset + frame_len - 1] << 8);
+                uint16_t cs_calc = calc_checksum(raw + offset, frame_len - 2);
+                if (cs_calc == cs_recv) {
+                    ESP_LOGI(TAG, "Valid frame found at offset %d, len=%u", offset, frame_len);
+                    parse_frame(raw + offset, &last);
+                    got_one = true;
+                    break;
+                }
+            }
         }
     }
 
-    if (!got_one) return false;
+    if (!got_one) {
+        ESP_LOGW(TAG, "No valid frame found in %d bytes (header 0x2D 0x23 not found or checksum mismatch)", n);
+        return false;
+    }
 
     *data = last;
 

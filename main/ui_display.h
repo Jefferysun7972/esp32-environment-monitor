@@ -113,6 +113,36 @@ typedef struct {
 } ui_dual_data_t;
 
 /* ============================================ */
+/* AM2020DY vs UART PM COMPARE DATA STRUCTURE   */
+/* ============================================ */
+typedef struct {
+    float a_temp;
+    float a_humidity;
+    float a_pm1;
+    float a_pm25;
+    float a_pm10;
+    float a_tvoc;
+    float a_hcho;
+
+    float u_temp;
+    float u_humidity;
+    float u_pm1;
+    float u_pm25;
+    float u_pm10;
+    float u_tvoc;
+    float u_co2;
+    float u_pres;
+    uint16_t u_aq;
+
+    uint16_t color_temp;
+    uint16_t color_humid;
+    uint16_t color_pm1;
+    uint16_t color_pm25;
+    uint16_t color_pm10;
+    int global_level;
+} ui_au_compare_data_t;
+
+/* ============================================ */
 /* UI DRAWING FUNCTIONS                         */
 /* ============================================ */
 
@@ -142,6 +172,16 @@ void ui_draw_sensor_screen(const ui_sensor_data_t *data);
  * @param data  Pointer to dual sensor data structure
  */
 void ui_draw_compare_table(const ui_dual_i2c_data_t *data);
+
+/**
+ * @brief Draw AM2020DY vs UART PM comparison table
+ *
+ * Focused on PM1.0 / PM2.5 / PM10 comparison between the two sensors.
+ * Temp and humidity shown for context.
+ *
+ * @param data  Pointer to comparison data structure
+ */
+void ui_draw_au_compare_table(const ui_au_compare_data_t *data);
 
 #ifdef __cplusplus
 }
