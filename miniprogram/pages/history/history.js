@@ -444,10 +444,17 @@ Page({
     // Check if tap on legend
     if (meta && touch && meta.legX !== undefined && meta.labelWidths) {
       const sensors = this._getSensors();
+      const series = meta.series || [];
       let cumX = 0;
       for (let i = 0; i < sensors.length; i++) {
         if (touch.x >= meta.legX + cumX && touch.x <= meta.legX + cumX + meta.labelWidths[i] &&
             touch.y >= 6 && touch.y <= 26) {
+          // 检查该传感器是否有数据
+          if (!series[i] || series[i].length === 0) {
+            console.log(`传感器 ${sensors[i].label} 无数据，忽略点击`);
+            return;
+          }
+          
           const showSensor = [...this.data.showSensor];
           showSensor[i] = !showSensor[i];
           this.setData({ showSensor }, () => this.drawChart());
@@ -656,10 +663,21 @@ Page({
 
     let cumX = 0;
     sensors.forEach((s, i) => {
-      ctx.fillStyle = this.data.showSensor[i] ? s.color : theme.legendDisabled;
-      ctx.fillRect(legX + cumX, 8, 14, 10);
-      ctx.fillStyle = this.data.showSensor[i] ? theme.legendText : theme.legendDisabled;
-      ctx.fillText(labels[i], legX + cumX + 18, 8);
+      const hasData = series[i] && series[i].length > 0;
+      const isEnabled = this.data.showSensor[i] && hasData;
+      
+      if (hasData) {
+        ctx.fillStyle = isEnabled ? s.color : theme.legendDisabled;
+        ctx.fillRect(legX + cumX, 8, 14, 10);
+        ctx.fillStyle = isEnabled ? theme.legendText : theme.legendDisabled;
+        ctx.fillText(labels[i], legX + cumX + 18, 8);
+      } else {
+        ctx.fillStyle = '#cccccc';
+        ctx.fillRect(legX + cumX, 8, 14, 10);
+        ctx.fillStyle = '#999999';
+        const noDataLabel = s.label.length > 5 ? s.label.substring(0, 5) : s.label;
+        ctx.fillText(noDataLabel + '(无)', legX + cumX + 18, 8);
+      }
       cumX += labelWidths[i];
     });
 
