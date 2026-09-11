@@ -1,31 +1,21 @@
 // ===========================================
- // 🔐 InfluxDB 配置 - 支持本地开发模式
+// 🔐 InfluxDB 配置
 // ===========================================
-// 
-// 配置优先级：
-// 1. config.local.js (本地开发，真实凭证) - 推荐
-// 2. 默认占位符 (公开代码，需替换)
 //
-// 使用方法：
-// - 复制 config.local.example.js 为 config.local.js
-// - 填写真实凭证
-// - 小程序会自动使用
+// 📝 本地开发：将下方占位符替换为真实凭证
+//    真实凭证备份在 config.local.js（gitignore 保护）
+//
+// ⚠️ 安全提示：
+//   - 不要将真实凭证提交到 Git
+//   - 提交前运行 scripts/security-check.sh 检查
+//
+// ⚠️ 微信小程序说明：
+//   - 小程序 JavaScript 会分发到用户手机
+//   - 生产环境建议使用后端 API 代理
 
-let INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_TOKEN;
-
-try {
-  const localConfig = require('./config.local');
-  INFLUXDB_URL = localConfig.INFLUXDB_URL;
-  INFLUXDB_ORG = localConfig.INFLUXDB_ORG;
-  INFLUXDB_TOKEN = localConfig.INFLUXDB_TOKEN;
-  console.log('[config] ✅ 已加载 config.local.js 中的真实配置');
-} catch (e) {
-  INFLUXDB_URL = 'https://YOUR_INFLUXDB_URL';
-  INFLUXDB_ORG = 'YOUR_ORG_NAME';
-  INFLUXDB_TOKEN = 'YOUR_INFLUXDB_TOKEN';
-  console.warn('[config] ⚠️ 未找到 config.local.js，使用默认占位符');
-  console.warn('[config]    解决方案: 复制 config.local.example.js 为 config.local.js 并填写真实凭证');
-}
+const INFLUXDB_URL = 'https://YOUR_INFLUXDB_URL';
+const INFLUXDB_ORG = 'YOUR_ORG_NAME';
+const INFLUXDB_TOKEN = 'YOUR_INFLUXDB_TOKEN';
 
 const REFRESH_INTERVAL = 20000;
 

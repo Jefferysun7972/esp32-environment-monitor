@@ -100,8 +100,6 @@ static bool s_connected = false;
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
                                int32_t event_id, void *event_data)
 {
-    esp_mqtt_event_handle_t event = event_data;
-
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG, "MQTT connected to broker");
@@ -163,7 +161,7 @@ void mqtt_cloud_publish(const mqtt_sensor_data_t *data)
 
     char buf[512];
 
-    int len = snprintf(buf, sizeof(buf),
+    snprintf(buf, sizeof(buf),
         "{\"temp\":%.1f,\"humi\":%.1f,\"pm1\":%.1f,\"pm25\":%.1f,\"pm10\":%.1f,"
         "\"tvoc\":%.1f,\"no2\":%.1f,\"hcho\":%.1f}",
         data->am2020dy_temp, data->am2020dy_humi,
@@ -172,7 +170,7 @@ void mqtt_cloud_publish(const mqtt_sensor_data_t *data)
     esp_mqtt_client_publish(s_client, "sensor/am2020dy", buf, 0, 1, 0);
 
     if (data->sen_ready) {
-        len = snprintf(buf, sizeof(buf),
+        snprintf(buf, sizeof(buf),
             "{\"temp\":%.1f,\"humi\":%.1f,\"pm1\":%.1f,\"pm25\":%.1f,\"pm10\":%.1f,"
             "\"tvoc\":%.1f,\"nox\":%.1f,\"co2\":%.1f,\"hcho\":%.1f}",
             data->sen_temp, data->sen_humi,
@@ -184,7 +182,7 @@ void mqtt_cloud_publish(const mqtt_sensor_data_t *data)
     }
 
     if (data->uart_ready) {
-        len = snprintf(buf, sizeof(buf),
+        snprintf(buf, sizeof(buf),
             "{\"temp\":%.1f,\"humi\":%.1f,\"pm1\":%.1f,\"pm25\":%.1f,\"pm10\":%.1f,"
             "\"tvoc\":%.1f,\"co2\":%.1f,\"pres\":%.1f,\"aq\":%u}",
             data->uart_temp, data->uart_humi,
