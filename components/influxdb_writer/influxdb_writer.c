@@ -27,8 +27,16 @@ static const char *TAG = "influxdb";
 #define USE_LOCAL_CREDENTIALS_INFLUX 0  // 默认不使用
 
 #ifdef __has_include
-    #if __has_include("credentials.local.h")
-        #ifndef CREDENTIALS_LOCAL_H  // 避免重复包含
+    // 🔑 关键：使用相对路径 ../../ 指向项目根目录
+    #if __has_include("../../credentials.local.h")
+        #ifndef CREDENTIALS_LOCAL_H
+            #include "../../credentials.local.h"
+        #endif
+        #undef USE_LOCAL_CREDENTIALS_INFLUX
+        #define USE_LOCAL_CREDENTIALS_INFLUX 1
+    #elif __has_include("credentials.local.h")
+        // 备用：尝试当前目录
+        #ifndef CREDENTIALS_LOCAL_H
             #include "credentials.local.h"
         #endif
         #undef USE_LOCAL_CREDENTIALS_INFLUX
@@ -36,15 +44,25 @@ static const char *TAG = "influxdb";
     #endif
 #endif
 
-// 如果 __has_include 不可用或失败，尝试直接包含（允许失败）
+// 回退方案：如果 __has_include 不可用或失败
 #if !USE_LOCAL_CREDENTIALS_INFLUX
     #ifndef CREDENTIALS_LOCAL_H
-        #include "credentials.local.h"
+        // 先尝试项目根目录
+        #include "../../credentials.local.h"
     #endif
     // 检查是否成功定义了必要的宏
     #ifdef LOCAL_INFLUXDB_URL
         #undef USE_LOCAL_CREDENTIALS_INFLUX
         #define USE_LOCAL_CREDENTIALS_INFLUX 1
+    #else
+        // 再尝试当前目录
+        #ifndef CREDENTIALS_LOCAL_H
+            #include "credentials.local.h"
+        #endif
+        #ifdef LOCAL_INFLUXDB_URL
+            #undef USE_LOCAL_CREDENTIALS_INFLUX
+            #define USE_LOCAL_CREDENTIALS_INFLUX 1
+        #endif
     #endif
 #endif
 

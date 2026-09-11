@@ -37,21 +37,35 @@ static const char *TAG = "wifi_web";
 #define USE_LOCAL_CREDENTIALS 0  // 默认不使用
 
 #ifdef __has_include
-    #if __has_include("credentials.local.h")
+    // 🔑 关键：使用相对路径 ../../ 指向项目根目录
+    // 因为组件在 components/ 子目录下，需要向上两级才能到达根目录
+    #if __has_include("../../credentials.local.h")
+        #include "../../credentials.local.h"
+        #undef USE_LOCAL_CREDENTIALS
+        #define USE_LOCAL_CREDENTIALS 1
+    #elif __has_include("credentials.local.h")
+        // 备用：尝试当前目录
         #include "credentials.local.h"
         #undef USE_LOCAL_CREDENTIALS
         #define USE_LOCAL_CREDENTIALS 1
     #endif
 #endif
 
-// 如果 __has_include 不可用或失败，尝试直接包含（允许失败）
+// 回退方案：如果 __has_include 不可用或失败
 #if !USE_LOCAL_CREDENTIALS
-    #include "credentials.local.h"
-    // 如果文件存在，上面的 include 会成功定义 LOCAL_WIFI_SSID 等宏
-    // 我们通过检查是否定义了 LOCAL_WIFI_SSID 来判断
+    // 先尝试项目根目录
+    #include "../../credentials.local.h"
     #ifdef LOCAL_WIFI_SSID
+        // 成功！找到了 credentials.local.h
         #undef USE_LOCAL_CREDENTIALS
         #define USE_LOCAL_CREDENTIALS 1
+    #else
+        // 再尝试当前目录
+        #include "credentials.local.h"
+        #ifdef LOCAL_WIFI_SSID
+            #undef USE_LOCAL_CREDENTIALS
+            #define USE_LOCAL_CREDENTIALS 1
+        #endif
     #endif
 #endif
 
