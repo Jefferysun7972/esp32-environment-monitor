@@ -104,21 +104,26 @@ for cred in "${REAL_CREDENTIALS[@]}"; do
     # - node_modules: 依赖包
     # - build: 编译产物
     # - .git: Git 内部文件
-    # - credentials.local.h: 本地配置文件（允许包含真实凭证）
-    # - *.local.h: 所有本地配置文件
+    # - credentials.local.h: ESP32 本地配置文件（允许包含真实凭证）
+    # - *.local.h: ESP32 所有本地配置文件
+    # - config.local.js: 小程序本地配置文件（允许包含真实凭证）
+    # - *config.local.*: 小程序所有本地配置文件
     if grep -r "$cred" --include="*.c" --include="*.h" --include="*.js" --include="*.json" \
            --exclude-dir=node_modules --exclude-dir=build --exclude-dir=.git \
-           --exclude="credentials.local.h" --exclude="*.local.h" 2>/dev/null; then
+           --exclude="credentials.local.h" --exclude="*.local.h" \
+           --exclude="config.local.js" --exclude="*config.local.*" 2>/dev/null; then
         echo -e "${RED}❌ 发现真实凭证: $cred${NC}"
         ((ERRORS++))
         FOUND_REAL_CREDS=true
     fi
 done
 
-# 特别说明：credentials.local.h 中的凭证是预期行为
-if [ -f "credentials.local.h" ]; then
-    echo -e "${BLUE}ℹ️  注意: credentials.local.h 包含真实凭证（这是正常的）${NC}"
-    echo -e "${BLUE}   此文件已被 .gitignore 保护，不会被提交到 Git${NC}"
+# 特别说明：本地配置文件中的凭证是预期行为
+if [ -f "credentials.local.h" ] || [ -f "miniprogram/config.local.js" ]; then
+    echo -e "${BLUE}ℹ️  注意: 本地配置文件包含真实凭证（这是正常的）${NC}"
+    echo -e "${BLUE}   这些文件已被 .gitignore 保护，不会被提交到 Git:${NC}"
+    [ -f "credentials.local.h" ] && echo -e "${BLUE}   - credentials.local.h (ESP32)${NC}"
+    [ -f "miniprogram/config.local.js" ] && echo -e "${BLUE}   - miniprogram/config.local.js (小程序)${NC}"
 fi
 
 if [ "$FOUND_REAL_CREDS" = false ]; then

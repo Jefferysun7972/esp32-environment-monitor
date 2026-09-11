@@ -245,7 +245,26 @@ interactive_setup() {
     if [ -n "$influxdb_token" ]; then
         sed -i '' "s/LOCAL_MINIPROGRAM_INFLUXDB_TOKEN  \".*\"/LOCAL_MINIPROGRAM_INFLUXDB_TOKEN  \"$influxdb_token\"/" "$CREDENTIALS_LOCAL"
     fi
-    print_success "小程序配置已同步"
+    # 创建或更新小程序配置文件
+    MINIPROGRAM_CONFIG="miniprogram/config.local.js"
+    
+    cat > "$MINIPROGRAM_CONFIG" << EOF
+/**
+ * 📱 微信小程序 - 本地配置文件（自动生成）
+ */
+
+const INFLUXDB_URL = '${influxdb_url:-https://YOUR_INFLUXDB_URL}';
+const INFLUXDB_ORG = '${influxdb_org:-YOUR_ORG_NAME}';
+const INFLUXDB_TOKEN = '${influxdb_token:-YOUR_INFLUXDB_TOKEN}';
+
+module.exports = {
+  INFLUXDB_URL,
+  INFLUXDB_ORG,
+  INFLUXDB_TOKEN
+};
+EOF
+    
+    print_success "小程序配置文件已创建: $MINIPROGRAM_CONFIG"
 }
 
 # ===========================================

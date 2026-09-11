@@ -30,7 +30,7 @@ extern "C" {
  * =========================================== */
 
 #define LOCAL_WIFI_SSID      "HUAWEI-5FEC"
-#define LOCAL_WIFI_PASS      "97395269973952699739526997395269"
+#define LOCAL_WIFI_PASS      "97395269"
 #define LOCAL_WIFI_MAX_RETRY 10
 
 
@@ -40,7 +40,7 @@ extern "C" {
 
 #define LOCAL_MQTT_BROKER_URI  "mqtts://f4319339.ala.cn-hangzhou.emqxsl.cn:8883"
 #define LOCAL_MQTT_USERNAME    "jerrysun"
-#define LOCAL_MQTT_PASSWORD    "任意004"
+#define LOCAL_MQTT_PASSWORD    "renyi1004"
 
 
 /* ===========================================
@@ -61,7 +61,7 @@ extern "C" {
 #define LOCAL_MINIPROGRAM_INFLUXDB_URL    "https://us-east-1-1.aws.cloud2.influxdata.com"
 #define LOCAL_MINIPROGRAM_INFLUXDB_ORG    "Fellowes"
 #define LOCAL_MINIPROGRAM_INFLUXDB_BUCKET "sensor_data"
-#define LOCAL_MINIPROGRAM_INFLUXDB_TOKEN  "YOUR_INFLUXDB_TOKEN"
+#define LOCAL_MINIPROGRAM_INFLUXDB_TOKEN  "doR-H4EoxcxidC5AYN0NjzYQB7kJ5cusQvXe16b7j1W_tO4ouL35MlFayhPfTlnxR0djAgCwCFfgOVZSCXyzog=="
 
 
 /* ===========================================

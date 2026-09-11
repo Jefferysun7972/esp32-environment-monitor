@@ -4,6 +4,19 @@
 
 ---
 
+## 📱 配置说明
+
+本项目包含 **两个独立的部分**，需要分别配置：
+
+| 部分 | 配置文件 | 用途 |
+|------|---------|------|
+| **ESP32 固件** | `credentials.local.h` | WiFi / MQTT / InfluxDB |
+| **微信小程序** | `miniprogram/config.local.js` | InfluxDB 查询 |
+
+✅ **好消息**：运行一次配置向导即可同时配置两者！
+
+---
+
 ## 🎯 一键配置（推荐）
 
 ```bash
@@ -72,6 +85,30 @@ idf.py build
 
 # 如果成功，说明配置正确！🎉
 ```
+
+---
+
+### Step 4 (可选): 配置微信小程序
+
+如果你需要使用微信小程序查看数据：
+
+```bash
+# 从模板创建小程序配置文件
+cp miniprogram/config.local.example.js miniprogram/config.local.js
+
+# 编辑配置文件
+code miniprogram/config.local.js
+```
+
+填写 InfluxDB 信息（与 ESP32 相同）：
+
+```javascript
+const INFLUXDB_URL = 'https://us-east-1-1.aws.cloud2.influxdata.com';
+const INFLUXDB_ORG = 'Fellowes';
+const INFLUXDB_TOKEN = '你的_InfluxDB_Token';
+```
+
+**注意**：小程序会自动加载此配置，无需修改 `app.js`！
 
 ---
 
