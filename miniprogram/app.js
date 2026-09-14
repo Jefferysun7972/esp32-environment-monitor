@@ -39,7 +39,9 @@ App({
   },
 
   _splitCSV(csv) {
-    const allLines = csv.trim().split('\n');
+    // 统一处理 \r\n / \r 换行符（InfluxDB Cloud 可能返回不同格式）
+    const normalized = csv.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const allLines = normalized.trim().split('\n');
     if (allLines.length < 2) return [];
     let headerIdx = 0;
     for (let i = 0; i < allLines.length; i++) {
@@ -437,14 +439,16 @@ schema.measurements(bucket: "sensor_data")`;
   },
 
   _parseMeasurementsCSV(csv) {
-    const lines = this._splitCSV(csv);
+    // 统一处理 \r\n（Windows 换行符）InfluxDB Cloud 可能返回 \r\n
+    const cleanCsv = csv.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    const lines = this._splitCSV(cleanCsv);
     if (lines.length < 2) return [];
-    const headers = lines[0].split(',');
+    const headers = lines[0].split(',').map(h => h.trim());
     const valueIdx = headers.indexOf('_value');
     if (valueIdx < 0) return [];
     const result = [];
     for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(',');
+      const cols = lines[i].split(',').map(c => c.trim());
       const name = (cols[valueIdx] || '').trim();
       if (name) result.push(name);
     }
@@ -538,7 +542,7 @@ schema.measurements(bucket: "sensor_data")`;
   _getCSVHeaders(csv) {
     const lines = this._splitCSV(csv);
     if (lines.length < 2) return null;
-    return { lines, headers: lines[0].split(',') };
+    return { lines, headers: lines[0].split(',').map(h => h.trim()) };
   },
 
   parseCSV(csv) {
