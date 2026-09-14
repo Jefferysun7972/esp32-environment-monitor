@@ -43,7 +43,8 @@
     "useCompilerPlugins": false,
     "compileWorklet": false,
     "localPlugins": false,
-    "condition": false
+    "condition": false,
+    "lazyCodeLoading": "requiredComponents"
   },
   "compileType": "miniprogram",
   "cloudfunctionRoot": "cloudfunctions/",
