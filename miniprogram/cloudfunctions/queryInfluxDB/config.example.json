@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "openapi": []
+  },
+  "env": {
+    "INFLUXDB_URL": "https://YOUR_INFLUXDB_URL",
+    "INFLUXDB_ORG": "YOUR_ORG_NAME",
+    "INFLUXDB_TOKEN": "YOUR_INFLUXDB_TOKEN"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "query-influxdb",
+  "version": "1.0.0",
+  "description": "InfluxDB 查询代理云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

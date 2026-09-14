@@ -108,10 +108,12 @@ for cred in "${REAL_CREDENTIALS[@]}"; do
     # - *.local.h: ESP32 所有本地配置文件
     # - config.local.js: 小程序本地配置文件（允许包含真实凭证）
     # - *config.local.*: 小程序所有本地配置文件
+    # - cloudfunctions/*/config.json: 云函数本地配置（允许）
     if grep -r "$cred" --include="*.c" --include="*.h" --include="*.js" --include="*.json" \
            --exclude-dir=node_modules --exclude-dir=build --exclude-dir=.git \
            --exclude="credentials.local.h" --exclude="*.local.h" \
-           --exclude="config.local.js" --exclude="*config.local.*" 2>/dev/null; then
+           --exclude="config.local.js" --exclude="*config.local.*" \
+           --exclude-dir=cloudfunctions/node_modules 2>/dev/null; then
         echo -e "${RED}❌ 发现真实凭证: $cred${NC}"
         ((ERRORS++))
         FOUND_REAL_CREDS=true

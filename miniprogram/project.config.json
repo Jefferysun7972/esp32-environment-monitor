@@ -46,6 +46,7 @@
     "condition": false
   },
   "compileType": "miniprogram",
+  "cloudfunctionRoot": "cloudfunctions/",
   "libVersion": "3.6.0",
   "appid": "wxa32bc7f2c490cf71",
   "projectname": "env-monitor",

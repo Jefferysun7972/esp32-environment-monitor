@@ -2,20 +2,47 @@
 // 🔐 InfluxDB 配置
 // ===========================================
 //
-// 📝 本地开发：将下方占位符替换为真实凭证
-//    真实凭证备份在 config.local.js（gitignore 保护）
+// 📝 云函数代理（推荐）
+//   1. 打开微信云开发控制台 → 云函数 → queryInfluxDB → 环境变量
+//   2. 设置 INFLUXDB_URL / INFLUXDB_ORG / INFLUXDB_TOKEN
+//   3. 小程序通过云函数代理查询，Token 不暴露到前端
+//
+// 💻 本地开发降级方案
+//   云函数未部署时自动使用下方直接连接
+//   真实凭证通过 config.local.js 注入（gitignore 保护）
 //
 // ⚠️ 安全提示：
-//   - 不要将真实凭证提交到 Git
+//   - 生产环境务必使用云函数代理
 //   - 提交前运行 scripts/security-check.sh 检查
-//
-// ⚠️ 微信小程序说明：
-//   - 小程序 JavaScript 会分发到用户手机
-//   - 生产环境建议使用后端 API 代理
 
-const INFLUXDB_URL = 'https://YOUR_INFLUXDB_URL';
-const INFLUXDB_ORG = 'YOUR_ORG_NAME';
-const INFLUXDB_TOKEN = 'YOUR_INFLUXDB_TOKEN';
+const INFLUXDB_URL = (() => {
+  try { return require('./config.local.js').INFLUXDB_URL; } catch (e) {}
+  return 'https://YOUR_INFLUXDB_URL';
+})();
+const INFLUXDB_ORG = (() => {
+  try { return require('./config.local.js').INFLUXDB_ORG; } catch (e) {}
+  return 'YOUR_ORG_NAME';
+})();
+const INFLUXDB_TOKEN = (() => {
+  try { return require('./config.local.js').INFLUXDB_TOKEN; } catch (e) {}
+  return 'YOUR_INFLUXDB_TOKEN';
+})();
+
+let _useCloudProxy = false;
+let _cloudChecked = false;
+
+function _checkCloudAvailable() {
+  if (_cloudChecked) return _useCloudProxy;
+  _cloudChecked = true;
+  try {
+    if (typeof wx.cloud !== 'undefined') {
+      _useCloudProxy = true;
+      return true;
+    }
+  } catch (e) {}
+  _useCloudProxy = false;
+  return false;
+}
 
 const REFRESH_INTERVAL = 20000;
 
@@ -54,6 +81,18 @@ App({
   },
 
   onLaunch() {
+    // 初始化云开发（云函数代理 InfluxDB 查询）
+    try {
+      const cloudEnvId = (() => {
+        try { return require('./config.local.js').CLOUD_ENV_ID; } catch (e) {}
+        return 'YOUR_CLOUD_ENV_ID';
+      })();
+      wx.cloud.init({ env: cloudEnvId });
+      console.log('[App] 云开发初始化成功');
+    } catch (e) {
+      console.warn('[App] 云开发未启用，使用直接连接模式');
+    }
+
     this._loadCache();
     this._loadSettings();
     
@@ -333,19 +372,35 @@ App({
   },
 
   _queryInfluxDB(query, timeout, callback) {
-    wx.request({
-      url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
-      method: 'POST',
-      timeout: timeout,
-      header: {
-        'Authorization': 'Token ' + INFLUXDB_TOKEN,
-        'Content-Type': 'application/vnd.flux',
-        'Accept': 'application/csv'
-      },
-      data: query,
-      success: (res) => callback(null, res),
-      fail: (err) => callback(err, null)
-    });
+    if (_checkCloudAvailable()) {
+      wx.cloud.callFunction({
+        name: 'queryInfluxDB',
+        data: { query: query, org: INFLUXDB_ORG, timeout: timeout }
+      }).then(cloudRes => {
+        const result = cloudRes.result;
+        if (result && result.success) {
+          callback(null, { statusCode: 200, data: result.data });
+        } else {
+          callback({ errMsg: result ? result.error : '云函数调用失败' }, null);
+        }
+      }).catch(err => {
+        callback(err, null);
+      });
+    } else {
+      wx.request({
+        url: INFLUXDB_URL + '/api/v2/query?org=' + encodeURIComponent(INFLUXDB_ORG),
+        method: 'POST',
+        timeout: timeout,
+        header: {
+          'Authorization': 'Token ' + INFLUXDB_TOKEN,
+          'Content-Type': 'application/vnd.flux',
+          'Accept': 'application/csv'
+        },
+        data: query,
+        success: (res) => callback(null, res),
+        fail: (err) => callback(err, null)
+      });
+    }
   },
 
   discoverSensors(callback) {

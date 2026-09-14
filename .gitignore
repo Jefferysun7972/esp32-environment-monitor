@@ -78,6 +78,14 @@ miniprogram/config.local.js
 miniprogram/*config.local.*
 miniprogram/app.js.placeholder
 
+# 云函数本地配置
+miniprogram/cloudfunctions/*/config.json
+!miniprogram/cloudfunctions/*/config.example.json
+
+# 云函数依赖
+miniprogram/cloudfunctions/*/node_modules/
+miniprogram/cloudfunctions/*/package-lock.json
+
 # -------------------------------------------
 # 💻 IDE & 编辑器配置
 # -------------------------------------------
