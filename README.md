@@ -4,8 +4,8 @@
 [![Platform](https://img.shields.io/badge/Platform-ESP32-green.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Security](https://img.shields.io/badge/Security-✅%20Safe-brightgreen.svg)
-![Version](https://img.shields.io/badge/Version-v1.4.0-blue.svg)
-![Release Date](https://img.shields.io/badge/Release-2026--09--10-lightgrey.svg)
+![Version](https://img.shields.io/badge/Version-v1.5.0-blue.svg)
+![Release Date](https://img.shields.io/badge/Release-2026--09--11-lightgrey.svg)
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-success.svg)
 
 **A multi-sensor environmental monitoring system based on ESP32**, integrating AM2020DY and SEN66/SEN68 sensors with ILI9341 TFT-LCD display, cloud data upload, and real-time visualization.
@@ -457,6 +457,27 @@ const INFLUXDB_TOKEN = 'your_api_token';
 ---
 
 ## 📋 更新日志 (Changelog)
+
+### [v1.5.0] - 2026-09-11
+
+#### 🛠️ 本地开发
+- ✅ `credentials.local.h` 本地凭证系统（ESP32 条件编译）
+- ✅ `scripts/setup-credentials.sh` 交互式配置向导
+- ✅ `scripts/mp-config.sh` 小程序凭证一键注入/还原
+- ✅ 分离开发环境与生产环境配置，避免硬编码凭证
+
+#### 🐛 Bug 修复
+- ✅ 修复 InfluxDB Cloud CSV `\r\n` 换行符解析失败
+- ✅ `_splitCSV` 统一处理 Windows/Unix 换行符
+- ✅ `_getCSVHeaders` trim 表头值消除尾随字符
+- ✅ 修复 `mqtt_cloud.c` 编译警告（未使用变量 `event`、`len`）
+
+#### 📝 文档
+- ✅ `LOCAL_DEVELOPMENT.md` 本地开发详细文档
+- ✅ `QUICKSTART_CREDENTIALS.md` 凭证配置快速入门
+- ✅ 更新 `.gitignore` 排除本地配置文件
+
+---
 
 ### [v1.4.0] - 2026-09-10
 
