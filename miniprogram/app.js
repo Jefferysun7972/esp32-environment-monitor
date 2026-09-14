@@ -424,8 +424,15 @@ schema.measurements(bucket: "sensor_data")`;
     this._queryInfluxDB(query, 20000, (err, res) => {
       if (!err && res && res.statusCode === 200) {
         console.log('[discover] 查询成功，响应数据长度:', res.data ? res.data.length : 0);
-        const measurements = this._parseMeasurementsCSV(res.data);
+        let measurements = this._parseMeasurementsCSV(res.data);
         console.log('[discover] 解析到测量值:', measurements);
+
+        // 过滤掉已停用的旧传感器（可选：在此处添加黑名单）
+        const DEPRECATED_SENSORS = ['SEN68']; // 已停用的传感器列表
+        measurements = measurements.filter(m => !DEPRECATED_SENSORS.includes(m));
+        if (measurements.length < this._parseMeasurementsCSV(res.data).length) {
+          console.log('[discover] 过滤已停用传感器后:', measurements);
+        }
         
         if (measurements.length > 0) {
           const sensors = measurements.map((m, i) => {
