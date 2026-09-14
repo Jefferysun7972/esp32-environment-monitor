@@ -30,9 +30,12 @@ const INFLUXDB_TOKEN = (() => {
 
 let _useCloudProxy = false;
 let _cloudChecked = false;
+let _cloudFailCount = 0;
+const CLOUD_FAIL_THRESHOLD = 2;
 
 function _checkCloudAvailable() {
-  if (_cloudChecked) return _useCloudProxy;
+  if (_cloudChecked && !_useCloudProxy) return false;
+  if (_cloudFailCount >= CLOUD_FAIL_THRESHOLD) return false;
   _cloudChecked = true;
   try {
     if (typeof wx.cloud !== 'undefined') {
@@ -42,6 +45,14 @@ function _checkCloudAvailable() {
   } catch (e) {}
   _useCloudProxy = false;
   return false;
+}
+
+function _markCloudFailed() {
+  _cloudFailCount++;
+  if (_cloudFailCount >= CLOUD_FAIL_THRESHOLD) {
+    console.warn('[Cloud] ⚠️ 云函数连续失败', _cloudFailCount, '次，自动降级为直接连接');
+    _useCloudProxy = false;
+  }
 }
 
 const REFRESH_INTERVAL = 20000;
@@ -381,9 +392,11 @@ App({
         if (result && result.success) {
           callback(null, { statusCode: 200, data: result.data });
         } else {
+          _markCloudFailed();
           callback({ errMsg: result ? result.error : '云函数调用失败' }, null);
         }
       }).catch(err => {
+        _markCloudFailed();
         callback(err, null);
       });
     } else {

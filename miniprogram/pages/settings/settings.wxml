@@ -90,5 +90,12 @@
         <text class="setting-arrow">›</text>
       </button>
     </view>
+    <view class="setting-item" bindtap="onPrivacyTap">
+      <view class="setting-info">
+        <text class="setting-label">隐私政策</text>
+        <text class="setting-desc">查看数据收集和使用说明</text>
+      </view>
+      <text class="setting-arrow">›</text>
+    </view>
   </view>
 </view>

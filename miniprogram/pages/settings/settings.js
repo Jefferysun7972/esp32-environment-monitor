@@ -169,5 +169,14 @@ Page({
       title: '传感器对比测试 - 实时环境监测',
       path: '/pages/index/index'
     };
+  },
+
+  onPrivacyTap() {
+    wx.showModal({
+      title: '隐私政策',
+      content: '本小程序用于展示 ESP32 环境传感器的实时数据和历史曲线。\n\n数据说明：\n• 传感器数据存储在 InfluxDB Cloud（加密传输）\n• 数据仅用于室内空气质量监测及空气质量传感器比较测试\n• 不会分享给第三方或用于商业用途\n• 用户无法查看他人的传感器数据\n\n云函数代理：\n• 所有数据库查询通过微信云函数代理\n• 敏感凭证存储在云端环境变量中\n• 前端代码不包含任何真实密钥',
+      showCancel: false,
+      confirmText: '我已了解'
+    });
   }
 });
