@@ -4,8 +4,8 @@
 [![Platform](https://img.shields.io/badge/Platform-ESP32-green.svg)](https://www.espressif.com/en/products/socs/esp32)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Security](https://img.shields.io/badge/Security-✅%20Safe-brightgreen.svg)
-![Version](https://img.shields.io/badge/Version-v1.5.0-blue.svg)
-![Release Date](https://img.shields.io/badge/Release-2026--09--11-lightgrey.svg)
+![Version](https://img.shields.io/badge/Version-v1.6.0-blue.svg)
+![Release Date](https://img.shields.io/badge/Release-2026--09--14-lightgrey.svg)
 ![Status](https://img.shields.io/badge/Status-Production%20Ready-success.svg)
 
 **A multi-sensor environmental monitoring system based on ESP32**, integrating AM2020DY and SEN66/SEN68 sensors with ILI9341 TFT-LCD display, cloud data upload, and real-time visualization.
@@ -457,6 +457,26 @@ const INFLUXDB_TOKEN = 'your_api_token';
 ---
 
 ## 📋 更新日志 (Changelog)
+
+### [v1.6.0] - 2026-09-14
+
+#### 🔒 安全升级（重要）
+- ✅ **云函数代理**：Token 从前端迁移至云端环境变量
+- ✅ 用户无法通过反编译获取真实凭证
+- ✅ 新增 `cloudfunctions/queryInfluxDB` 云函数（Node.js）
+- ✅ 智能降级机制：云函数失败自动切换直接连接
+
+#### 📱 小程序优化
+- ✅ **隐私政策**：设置页新增隐私政策入口（审核合规）
+- ✅ **组件按需注入**：启用 `lazyCodeLoading` 优化性能
+- ✅ **自动降级**：代理/网络干扰时无缝切换连接方式
+
+#### 🔧 开发体验
+- ✅ `project.config.json` 添加 `cloudfunctionRoot` 配置
+- ✅ `.gitignore` 排除云函数本地配置和 node_modules
+- ✅ `security-check.sh` 更新排除规则
+
+---
 
 ### [v1.5.0] - 2026-09-11
 
