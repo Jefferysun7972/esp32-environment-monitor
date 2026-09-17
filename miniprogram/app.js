@@ -31,9 +31,23 @@ const INFLUXDB_TOKEN = (() => {
 let _useCloudProxy = false;
 let _cloudChecked = false;
 let _cloudFailCount = 0;
-const CLOUD_FAIL_THRESHOLD = 2;
+const CLOUD_FAIL_THRESHOLD = 2;  // 恢复为2次，给云函数更多机会
+let _cloudTemporarilyDisabled = false;  // 临时禁用（本次会话）
+let _cloudDisabledUntil = 0;  // 禁用到此时间戳
 
 function _checkCloudAvailable() {
+  // 如果临时禁用且未过期
+  if (_cloudTemporarilyDisabled && Date.now() < _cloudDisabledUntil) {
+    return false;
+  }
+  // 禁用已过期，重置状态
+  if (_cloudTemporarilyDisabled && Date.now() >= _cloudDisabledUntil) {
+    console.log('[Cloud] 临时禁用已过期，重新尝试云函数');
+    _cloudTemporarilyDisabled = false;
+    _cloudFailCount = 0;
+    _useCloudProxy = true;
+  }
+  
   if (_cloudChecked && !_useCloudProxy) return false;
   if (_cloudFailCount >= CLOUD_FAIL_THRESHOLD) return false;
   _cloudChecked = true;
@@ -47,8 +61,23 @@ function _checkCloudAvailable() {
   return false;
 }
 
-function _markCloudFailed() {
+function _markCloudFailed(err) {
   _cloudFailCount++;
+  
+  // 检测是否是超时错误
+  const errMsg = err && (err.errMsg || '');
+  if (errMsg.includes('-504003') || errMsg.includes('timed out')) {
+    console.warn('[Cloud] ⚠️ 检测到云函数超时错误');
+    console.warn('[Cloud] 原因：免费版云函数3秒限制');
+    console.warn('[Cloud] 处理：临时禁用 5 分钟，使用直接连接模式');
+    
+    // 临时禁用5分钟（而不是永久）
+    _cloudTemporarilyDisabled = true;
+    _cloudDisabledUntil = Date.now() + (5 * 60 * 1000);  // 5分钟后重试
+    _useCloudProxy = false;
+    return;
+  }
+  
   if (_cloudFailCount >= CLOUD_FAIL_THRESHOLD) {
     console.warn('[Cloud] ⚠️ 云函数连续失败', _cloudFailCount, '次，自动降级为直接连接');
     _useCloudProxy = false;
@@ -92,6 +121,24 @@ App({
   },
 
   onLaunch() {
+    console.log('[App] 小程序启动');
+
+    if (wx.requirePrivacyAuthorize) {
+      wx.requirePrivacyAuthorize({
+        success: () => {
+          console.log('[App] ✅ 用户已同意隐私协议');
+          this._initAfterPrivacy();
+        },
+        fail: () => {
+          console.log('[App] ⚠️ 用户拒绝隐私协议，功能受限');
+        }
+      });
+    } else {
+      this._initAfterPrivacy();
+    }
+  },
+
+  _initAfterPrivacy() {
     // 初始化云开发（云函数代理 InfluxDB 查询）
     try {
       const cloudEnvId = (() => {
@@ -386,17 +433,18 @@ App({
     if (_checkCloudAvailable()) {
       wx.cloud.callFunction({
         name: 'queryInfluxDB',
-        data: { query: query, org: INFLUXDB_ORG, timeout: timeout }
+        data: { query: query, org: INFLUXDB_ORG, timeout: timeout },
+        timeout: Math.max(timeout || 15000, 10000)  // 云函数调用超时：至少10秒，优先使用查询超时时间
       }).then(cloudRes => {
         const result = cloudRes.result;
         if (result && result.success) {
           callback(null, { statusCode: 200, data: result.data });
         } else {
-          _markCloudFailed();
+          _markCloudFailed({ errMsg: result ? result.error : '云函数调用失败' });
           callback({ errMsg: result ? result.error : '云函数调用失败' }, null);
         }
       }).catch(err => {
-        _markCloudFailed();
+        _markCloudFailed(err);
         callback(err, null);
       });
     } else {
@@ -532,16 +580,36 @@ schema.measurements(bucket: "sensor_data")`;
 
   fetchData() {
     // 一次查询所有 measurement，从数据中自动识别传感器
+    // 使用 5 分钟时间窗口（云函数模式下）或 30 分钟（直连模式）
+    // 优化策略：
+    //   - 云函数模式：短时间窗口 + last() → 快速响应 < 3秒
+    //   - 直连模式：长时间窗口 + last() → 容忍离线
+    
+    const timeWindow = _useCloudProxy ? '-5m' : '-30m';
     const query = `from(bucket: "sensor_data")
-  |> range(start: -5m)
-  |> aggregateWindow(every: 5m, fn: last, createEmpty: false)`;
+  |> range(start: ${timeWindow})
+  |> last()`;
 
     this._queryInfluxDB(query, 15000, (err, res) => {
       if (!err && res && res.statusCode === 200) {
+        console.log('[fetchData] 原始响应长度:', res.data ? res.data.length : 0);
+        console.log('[fetchData] 原始响应前200字符:', (res.data || '').substring(0, 200));
+        
         const parsed = this.parseCSVWithMeasurement(res.data);
+        console.log('[fetchData] 解析后数据条数:', parsed.length);
         
         if (parsed.length === 0) {
-          console.warn('[fetchData] 查询成功但无数据');
+          console.warn('[fetchData] ⚠️ 诊断信息：');
+          console.warn('  - HTTP 状态码: 200 (成功)');
+          console.warn('  - 响应数据长度:', res.data ? res.data.length : 0);
+          console.warn('  - 当前时间:', new Date().toISOString());
+          console.warn('  - 查询时间范围: 最近30分钟');
+          console.warn('  - 可能原因:');
+          console.warn('    1. InfluxDB 中确实无最近30分钟的数据');
+          console.warn('    2. 数据格式变化导致解析失败');
+          console.warn('    3. 聚合窗口边界问题 (aggregateWindow)');
+          console.warn('  - 原始响应内容:', (res.data || '空').substring(0, 500));
+          
           this.globalData._lastError = '无数据（ESP32 可能未上报）';
           this.globalData.connected = false;
           this.notifyPages();
